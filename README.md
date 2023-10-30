@@ -1,4 +1,4 @@
-## 4 Leg Walking Robot 
+## (SLAM) system for a robot equipped with a laser
 
 ### Code
 In this repository the code used to build and program a simultaneous localization and
