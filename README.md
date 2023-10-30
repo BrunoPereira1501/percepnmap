@@ -7,7 +7,7 @@ marks located in the operation area.
 
 
 ### Report 
-Along with the code, there is a pdf, which is the explanations of the different problems in the assignement.
+Along with the code, there is a pdf, which has the explanation of the different problems in the assignement.
 
 ### Authors
 The project was developed by:

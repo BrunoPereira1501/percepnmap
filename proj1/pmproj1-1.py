@@ -206,8 +206,8 @@ def update(frame):
     plt.subplot(121)  # Subplot on the left
     plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
     plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
-    plt.scatter(xp1, yp1, label='Beacon 1 Coordinates', color='g', marker='s')
-    plt.scatter(xp2, yp2, label='Beacon 2 Coordinates', color='g', marker='s')
+    plt.scatter(xp1, yp1, label='Beacon 1 Coordinates', color='yellow', marker='s')
+    plt.scatter(xp2, yp2, label='Beacon 2 Coordinates', color='orange', marker='s')
     plt.xlabel('X Position')
     plt.ylabel('Y Position')
     plt.title('Actual Robot Position Over Time')
