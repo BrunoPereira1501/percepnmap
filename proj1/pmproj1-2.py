@@ -275,20 +275,17 @@ def update(frame):
     plt.subplot(121)  # Subplot on the left
     plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
     plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
-    detected_1 = 'g'
-    detected_2 = 'g'
-    if(r1[i] == 0):
-        detected_1 = 'r'
-    if(r2[i] == 0):
-        detected_2 = 'r'
-    elif(r1[i] == 0 and r2[i] == 0):
-        detected_1 = 'r'
-        detected_2 = 'r'
+    
+    detected_1 = 'yellow' if r1[frame] != 0 else 'k'
+    detected_2 = 'orange' if r2[frame] != 0 else 'k'
+ 
     plt.scatter(xp1, yp1, label='Beacon 1 Coordinates', color=detected_1, marker='s')
     plt.scatter(xp2, yp2, label='Beacon 2 Coordinates', color=detected_2, marker='s')    
+    
     plt.xlabel('X Position')
     plt.ylabel('Y Position')
     plt.title('Actual Robot Position Over Time')
+    plt.text(-5, 0, f'Frame: {frame}', fontsize=12, color='black')  # Add frame number as text
     plt.legend()
     plt.grid(True)
 
@@ -303,8 +300,9 @@ def update(frame):
 plt.figure(figsize=(12, 6))
 
 # Create the initial plot
-ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=1)
+ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=50)
 
 # Show the animation
 plt.show()
+
 
