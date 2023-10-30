@@ -76,8 +76,8 @@ psi2 = [row['psi2'] for row in data_list]
 
 # Covariances
 P = np.eye(3)*1e-2
-Q = np.array([[0.005**2, 0],
-     [0, 0.005**2 ]])
+Q = np.array([[0.5**2, 0],
+     [0, 0.05**2 ]])
 
 # Std for the beacons 
 sdv_r = 0.5
@@ -217,6 +217,7 @@ def update(frame):
     plt.subplot(122)  # Subplot on the right
     plt.scatter(x_real[:frame], y_real[:frame], color='red', label='Real Trajectory', s=5)
     plt.scatter(x_est[:frame], y_est[:frame], color='green', label='Estimated Trajectory', s=5)
+    plt.text(-5, 0, f'Frame: {frame}', fontsize=12, color='black')  # Add frame number as text
     plt.xlabel('X')
     plt.ylabel('Y')
     plt.legend()
@@ -228,5 +229,16 @@ plt.figure(figsize=(12, 6))
 ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=1)
 
 # Show the animation
+plt.show()
+
+# Create a plot for 'x' vs. 'y'
+plt.figure(figsize=(8, 6))
+plt.plot(x_real, y_real, label='Real Robot Position', color='b')
+plt.plot(x_est, y_est, label='Robot Position Estimation', color='r')
+plt.xlabel('X Position')
+plt.ylabel('Y Position')
+plt.title('Actual Robot Position Over Time')
+plt.legend()
+plt.grid(True)
 plt.show()
 

@@ -29,7 +29,7 @@ Ks = []
 data_list = []
 
 # Open the data file for reading
-with open('Datasets-20231026\data2.txt', 'r') as file:
+with open('Datasets-20231026\data3.txt', 'r') as file:
     for line in file:
         # Split the line into individual values using spaces as the delimiter
         values = line.split()
@@ -41,11 +41,9 @@ with open('Datasets-20231026\data2.txt', 'r') as file:
         theta = float(values[3])
         v = float(values[4])
         omega = float(values[5])
-        r1 = float(values[6])
-        psi1 = float(values[7])
-        r2 = float(values[8])
-        psi2 = float(values[9])
-        
+        r = float(values[6])
+        psi = float(values[7])
+    
         # Create a dictionary for the current line and append it to the data list
         row_data = {
             't': t,
@@ -54,11 +52,9 @@ with open('Datasets-20231026\data2.txt', 'r') as file:
             'theta': theta,
             'v': v,
             'omega': omega,
-            'r1': r1,
-            'psi1': psi1,
-            'r2': r2,
-            'psi2': psi2
-        }
+            'r': r,
+            'psi': psi
+            }
         data_list.append(row_data)
 
 # Get the data in the respective lists
@@ -68,10 +64,9 @@ y = [row['y'] for row in data_list]
 theta = [row['theta'] for row in data_list]
 v = [row['v'] for row in data_list]
 w = [row['omega'] for row in data_list]
-r1 = [row['r1'] for row in data_list]
-psi1 = [row['psi1'] for row in data_list]
-r2 = [row['r2'] for row in data_list]
-psi2 = [row['psi2'] for row in data_list]
+r = [row['r'] for row in data_list]
+psi = [row['psi'] for row in data_list]
+
 
 
 # Covariances
@@ -89,6 +84,7 @@ X_e_t = []
 Zmed = []
 Zest = []
 Ks = []
+B = []
 
 # Beacons coordinates
 xp1 = 0
@@ -131,8 +127,25 @@ for i in range(int(N)):
     # Covariance propagation
     P = grad_f_X @ P @ grad_f_X.transpose() + grad_f_U @ Q @ grad_f_U.transpose()
 
+    distb1 = np.sqrt((xr_e - xp1)**2 + (yr_e - yp1)**2) 
+    distb2 = np.sqrt((xr_e - xp2)**2 + (yr_e - yp2)**2)
+
+    if(r[i] == 0):
+        beacon1 = False
+        beacon2 = False
+        B.append(0)
+
+    elif (abs(distb1 -  r[i]) < abs(distb2 - r[i])):
+        beacon1 = True
+        beacon2 = False
+        B.append(1)
+    else:
+        beacon2 = True
+        beacon1 = False
+        B.append(2)
+    
     # Check if B1 is in the field of view
-    if(r1[i] == 0 and r2[i] != 0):
+    if(r[i] != 0 and beacon1):
         # Measures with the actual robot state, z=h(X)
         distp_e_2 = np.sqrt((xp2 - xr_e)**2 + (yp2- yr_e)**2)
         psi_p_e_2 = ang_normalized(np.arctan2(yp2 - yr_e, xp2 - xr_e) - theta_r_e)
@@ -140,8 +153,8 @@ for i in range(int(N)):
         z_e = np.array([[distp_e_2],
             [psi_p_e_2]])
     
-        z = np.array([[r2[i]],
-                [psi2[i]]])
+        z = np.array([[r[i]],
+                [psi[i]]])
 
         # Covariance for the measures 
         R = [[sdv_r**2, 0],
@@ -164,9 +177,8 @@ for i in range(int(N)):
         X_e = X_e + k @ (z_dif)
         X_e[2] = ang_normalized(X_e[2])
 
-
     # Check if B2 is in the field of view
-    elif(r2[i] == 0) and r1[i] != 0:
+    elif(r[i] != 0 and beacon2):
         # Measures with the actual robot state, z=h(X)
         distp_e_1 = np.sqrt((xp1 - xr_e)**2 + (yp1 - yr_e)**2)
         psi_p_e_1 = ang_normalized(np.arctan2(yp1 - yr_e, xp1 - xr_e) - theta_r_e)
@@ -174,8 +186,8 @@ for i in range(int(N)):
         z_e = np.array([[distp_e_1],
                 [psi_p_e_1]])
     
-        z = np.array([[r1[i]],
-                [psi1[i]]])
+        z = np.array([[r[i]],
+                [psi[i]]])
 
         # Covariance for the measures 
         R = [[sdv_r**2, 0],
@@ -195,51 +207,6 @@ for i in range(int(N)):
         # State update
         z_dif = z - z_e
         z_dif[1] = ang_normalized(z_dif[1])
-        X_e = X_e + k @ (z_dif)
-        X_e[2] = ang_normalized(X_e[2])
-
-    # Check if B1 and B2 are in the field of view
-    elif(r1[i] != 0 and r2[i] != 0):
-        # Measures with the actual robot state, z=h(X)
-        distp_e_1 = np.sqrt((xp1 - xr_e)**2 + (yp1 - yr_e)**2)
-        psi_p_e_1 = ang_normalized(np.arctan2(yp1 - yr_e, xp1 - xr_e) - theta_r_e)
-        
-        # Measures with the actual robot state, z=h(X)
-        distp_e_2 = np.sqrt((xp2 - xr_e)**2 + (yp2- yr_e)**2)
-        psi_p_e_2 = ang_normalized(np.arctan2(yp2 - yr_e, xp2 - xr_e) - theta_r_e)
-
-        z_e = np.array([[distp_e_1],
-            [psi_p_e_1], 
-            [distp_e_2],
-            [psi_p_e_2]])
-    
-        z = np.array([[r1[i]],
-                [psi1[i]],
-                [r2[i]],
-                [psi2[i]]])
-
-        # Covariance for the measures 
-        R = [[sdv_r**2, 0, 0, 0],
-                [0, sdv_psi**2, 0, 0],
-                [0, 0, sdv_r**2, 0],
-                [0, 0, 0, sdv_psi**2]]
-
-        # Gradient of h(X)
-        grad_h_X  = np.array([[-((xp1 - xr_e)/(np.sqrt((xp1-xr_e)**2+(yp1-yr_e)**2))), -((yp1-yr_e)/(np.sqrt((xp1-xr_e)**2+(yp1-yr_e)**2))), 0],
-                [((yp1-yr_e)/((xp1-xr_e)**2+(yp1-yr_e)**2)), -((xp1-xr_e)/((xp1-xr_e)**2+(yp1-yr_e)**2)), -1],
-                [-((xp2 - xr_e)/(np.sqrt((xp2-xr_e)**2+(yp2-yr_e)**2))), -((yp2-yr_e)/(np.sqrt((xp2-xr_e)**2+(yp2-yr_e)**2))), 0],
-                [((yp2-yr_e)/((xp2-xr_e)**2+(yp2-yr_e)**2)), -((xp2-xr_e)/((xp2-xr_e)**2+(yp2-yr_e)**2)), -1]])
-
-        # Kalman Gain
-        k = P @ grad_h_X.transpose() @ np.linalg.inv(grad_h_X @ P @ grad_h_X.transpose() + R)
-
-        # Covariance update
-        P = (np.eye(3)- k @ grad_h_X) @ P
-
-        # State update
-        z_dif = z - z_e
-        z_dif[1] = ang_normalized(z_dif[1])
-        z_dif[3] = ang_normalized(z_dif[3])
         X_e = X_e + k @ (z_dif)
         X_e[2] = ang_normalized(X_e[2])
     
@@ -276,8 +243,8 @@ def update(frame):
     plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
     plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
     
-    detected_1 = 'yellow' if r1[frame] != 0 else 'k'
-    detected_2 = 'orange' if r2[frame] != 0 else 'k'
+    detected_1 = 'yellow' if B[frame] == 1 else 'k'
+    detected_2 = 'orange' if B[frame] == 2 else 'k'
  
     plt.scatter(xp1, yp1, label='Beacon 1 Coordinates', color=detected_1, marker='s')
     plt.scatter(xp2, yp2, label='Beacon 2 Coordinates', color=detected_2, marker='s')    
@@ -300,7 +267,7 @@ def update(frame):
 plt.figure(figsize=(12, 6))
 
 # Create the initial plot
-ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=1)
+ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=50)
 
 # Show the animation
 plt.show()
