@@ -136,50 +136,44 @@ for i in range(int(N)):
     P = grad_f_X @ P @ grad_f_X.transpose() + grad_f_U @ Q @ grad_f_U.transpose()
 
         
-    # Measures with the actual robot state, z=h(X)
-    distp_e_1 = np.sqrt((xp1 - X_e[0][0])**2 + (yp1 - X_e[1][0])**2)
-    theta_p_e_1 = ang_normalized(np.arctan2(yp1 - X_e[1][0], xp1 - X_e[0][0]) - X_e[2][0])
-    
-    # Measures with the actual robot state, z=h(X)
-    distp_e_2 = np.sqrt((xp2 - X_e[0][0])**2 + (yp2- X_e[1][0])**2)
-    theta_p_e_2 = ang_normalized(np.arctan2(yp2 - X_e[1][0], xp2 - X_e[0][0]) - X_e[2][0])
+    for j in range(2):
+        if(j == 0):
+            r, psi, xp, yp = r1[i], psi1[i], xp1, yp1
+        else:
+            r, psi, xp, yp = r2[i], psi2[i], xp2, yp2
 
-    z_e = np.array([[distp_e_1],
-            [theta_p_e_1], 
-            [distp_e_2],
-            [theta_p_e_2]])
-    
-    z = np.array([[r1[i]],
-            [psi1[i]],
-            [r2[i]],
-            [psi2[i]]])
-    
-    # Covariance for the measures 
-    R = [[sdv_r**2, 0, 0, 0],
-            [0, sdv_psi**2, 0, 0],
-            [0, 0, sdv_r**2, 0],
-            [0, 0, 0, sdv_psi**2]]
+        # Measures with the actual robot state, z=h(X)
+        distp_e = np.sqrt((xp - xr_e)**2 + (yp - yr_e)**2)
+        psi_p_e = ang_normalized(np.arctan2(yp - yr_e, xp - xr_e) - theta_r_e)
 
-    # Gradient of h(X)
-    grad_h_X  = np.array([[-((xp1 - X_e[0][0])/(np.sqrt((xp1-X_e[0][0])**2+(yp1-X_e[1][0])**2))), -((yp1-X_e[1][0])/(np.sqrt((xp1-X_e[0][0])**2+(yp1-X_e[1][0])**2))), 0],
-            [((yp1-X_e[1][0])/((xp1-X_e[0][0])**2+(yp1-X_e[1][0])**2)), -((xp1-X_e[0][0])/((xp1-X_e[0][0])**2+(yp1-X_e[1][0])**2)), -1],
-            [-((xp2 - X_e[0][0])/(np.sqrt((xp2-X_e[0][0])**2+(yp2-X_e[1][0])**2))), -((yp2-X_e[1][0])/(np.sqrt((xp2-X_e[0][0])**2+(yp2-X_e[1][0])**2))), 0],
-            [((yp2-X_e[1][0])/((xp2-X_e[0][0])**2+(yp2-X_e[1][0])**2)), -((xp2-X_e[0][0])/((xp2-X_e[0][0])**2+(yp2-X_e[1][0])**2)), -1]])
-        
-    # Kalman Gain
-    k = P @ grad_h_X.transpose() @ np.linalg.inv(grad_h_X @ P @ grad_h_X.transpose() + R)
-
-    # Covariance update
-    P = (np.eye(3)- k @ grad_h_X) @ P
+        z_e = np.array([[distp_e],
+                [psi_p_e]])
     
-    # State update
-    z_dif = z - z_e
-    z_dif[1] = ang_normalized(z_dif[1])
-    z_dif[3] = ang_normalized(z_dif[3])
-    X_e = X_e + k @ (z_dif)
-    X_e[2] = ang_normalized(X_e[2])
+        z = np.array([[r],
+                [psi]])
 
-    # Save the results in lists 
+        # Covariance for the measures 
+        R = [[sdv_r**2, 0],
+                [0, sdv_psi**2]]
+               
+
+        # Gradient of h(X)
+        grad_h_X  = np.array([[-((xp - xr_e)/(np.sqrt((xp-xr_e)**2+(yp-yr_e)**2))), -((yp-yr_e)/(np.sqrt((xp-xr_e)**2+(yp-yr_e)**2))), 0],
+                [((yp-yr_e)/((xp-xr_e)**2+(yp-yr_e)**2)), -((xp-xr_e)/((xp-xr_e)**2+(yp-yr_e)**2)), -1]])
+
+        # Kalman Gain
+        k = P @ grad_h_X.transpose() @ np.linalg.inv(grad_h_X @ P @ grad_h_X.transpose() + R)
+
+        # Covariance update
+        P = (np.eye(3)- k @ grad_h_X) @ P
+
+        # State update
+        z_dif = z - z_e
+        z_dif[1] = ang_normalized(z_dif[1])
+        X_e = X_e + k @ (z_dif)
+        X_e[2] = ang_normalized(X_e[2])
+    
+        # Save the results in lists 
     X_t.append(X) 
     X_e_t.append(X_e)
     Zmed.append(z) 
