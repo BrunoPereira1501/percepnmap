@@ -274,8 +274,8 @@ plt.show()
 
 # Create a plot for 'x' vs. 'y'
 plt.figure(figsize=(8, 6))
-plt.plot(x_real, y_real, label='Real Robot Position', color='b')
-plt.plot(x_est, y_est, label='Robot Position Estimation', color='r')
+plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s = 5)
+plt.scatter(x_est, y_est, label='Robot Position Estimation', color='r', s = 5)
 plt.xlabel('X Position')
 plt.ylabel('Y Position')
 plt.title('Actual Robot Position Over Time')

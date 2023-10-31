@@ -113,20 +113,20 @@ for i in range(int(N)):
     X = [[x[i]], [y[i]], [theta[i]]]
      
     # Predict X(k+1) = f(X(k),U)
-    xr_e = xr_e + v[i] * dt * np.cos(theta_r_e + w[i] * dt/2); 
-    yr_e = yr_e + v[i] * dt * np.sin(theta_r_e + w[i] * dt/2); 
-    theta_r_e = theta_r_e + w[i] * dt;  
+    xr_e = xr_e + v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e)) 
+    yr_e = yr_e + v[i]/w[i] * (np.cos(theta_r_e) - np.cos(theta_r_e + w[i]*dt))
+    theta_r_e = theta_r_e + w[i] * dt 
     X_e = np.array([ [xr_e], [yr_e], [theta_r_e]])
 
     # Gradient of f(X)
-    grad_f_X = np.array([[1, 0, -v[i] * dt * np.sin(theta_r_e + w[i] * dt/2)],
-            [0, 1, v[i] * dt * np.cos(theta_r_e + w[i] * dt/2)],
+    grad_f_X = np.array([[1, 0, v[i]/w[i] * (np.cos(theta_r_e + w[i]*dt) - np.cos(theta_r_e))],
+            [0, 1, v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e))],
             [0, 0, 1]])
     
     # Gradient of f(U)
-    grad_f_U = np.array([[np.cos(theta_r_e + w[i] * dt/2), -(1/2)* v[i] * dt * np.sin(theta_r_e + w[i] * dt/2)],
-            [np.sin(theta_r_e + w[i] * dt/2), (1/2)* v[i] * dt * np.cos(theta_r_e + w[i] * dt/2)],
-            [0, 1]])
+    grad_f_U = np.array([[1/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e)), v[i]/(w[i]**2) * (dt*w[i]*np.cos(theta_r_e + w[i]*dt) - np.sin(theta_r_e + w[i]*dt)+ np.sin(theta_r_e))],
+            [1/w[i] * (-np.cos(theta_r_e + w[i]*dt) + np.cos(theta_r_e)), v[i]/(w[i]**2) * (dt*w[i]*np.sin(theta_r_e + w[i]*dt) + np.cos(theta_r_e + w[i]*dt) + np.cos(theta_r_e))],
+            [0, dt]])
 
     # Covariance propagation
     P = grad_f_X @ P @ grad_f_X.transpose() + grad_f_U @ Q @ grad_f_U.transpose()
@@ -315,3 +315,5 @@ plt.title('Actual Robot Position Over Time')
 plt.legend()
 plt.grid(True)
 plt.show()
+
+
