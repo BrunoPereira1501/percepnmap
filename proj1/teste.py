@@ -1,242 +1,369 @@
+"""
+Extended Kalman Filter SLAM example
+original author: Atsushi Sakai (@Atsushi_twi)
+notebook author: Andrew Tu (drewtu2)
+"""
+
+import math
 import numpy as np
-from numpy import *
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-
-def ang_normalized(ang):
-    
-    ang_normalized = ang
-
-    while ang_normalized > np.pi:
-        ang_normalized = ang_normalized - 2*np.pi
-    
-    while ang_normalized <= -np.pi:
-        ang_normalized = ang_normalized + 2*np.pi
-
-    return ang_normalized
-
-# Iteration number
-N = 2000
-
-# Lists for the results 
-X_t = []
-X_e_t = []
-Zmed = []
-Zest = []
-Ks = []
-
-# Initialize an empty list to store the data
-data_list = []
-
-# Open the data file for reading
-with open('Datasets-20231026\data1.txt', 'r') as file:
-    for line in file:
-        # Split the line into individual values using spaces as the delimiter
-        values = line.split()
-        
-        # Convert the values to the appropriate data types (float in this case)
-        t = float(values[0])
-        x = float(values[1])
-        y = float(values[2])
-        theta = float(values[3])
-        v = float(values[4])
-        omega = float(values[5])
-        r1 = float(values[6])
-        psi1 = float(values[7])
-        r2 = float(values[8])
-        psi2 = float(values[9])
-        
-        # Create a dictionary for the current line and append it to the data list
-        row_data = {
-            't': t,
-            'x': x,
-            'y': y,
-            'theta': theta,
-            'v': v,
-            'omega': omega,
-            'r1': r1,
-            'psi1': psi1,
-            'r2': r2,
-            'psi2': psi2
-        }
-        data_list.append(row_data)
-
-# Get the data in the respective lists
-time = [row['t'] for row in data_list]
-x = [row['x'] for row in data_list]
-y = [row['y'] for row in data_list]
-theta = [row['theta'] for row in data_list]
-v = [row['v'] for row in data_list]
-w = [row['omega'] for row in data_list]
-r1 = [row['r1'] for row in data_list]
-psi1 = [row['psi1'] for row in data_list]
-r2 = [row['r2'] for row in data_list]
-psi2 = [row['psi2'] for row in data_list]
 
 
-# Covariances
-P = np.eye(3)*1e-3
-Q = np.array([[0.5**2, 0],
-     [0, 0.05**2 ]])
+# EKF state covariance
+Cx = np.diag([0.5, 0.5, np.deg2rad(30.0)])**2 # Change in covariance
 
-# Std for the beacons 
-sdv_r = 0.5
-sdv_psi = 0.1
+#  Simulation parameter
+Qsim = np.diag([0.2, np.deg2rad(1.0)])**2  # Sensor Noise
+Rsim = np.diag([1.0, np.deg2rad(10.0)])**2 # Process Noise
 
-# Variables to record simulation
-X_t = []
-X_e_t = []
-Zmed = []
-Zest = []
-Ks = []
+DT = 0.1  # time tick [s]
+SIM_TIME = 50.0  # simulation time [s]
+MAX_RANGE = 20.0  # maximum observation range
+M_DIST_TH = 2.0  # Threshold of Mahalanobis distance for data association.
+STATE_SIZE = 3  # State size [x,y,yaw]
+LM_SIZE = 2  # LM state size [x,y]
 
-# Beacons coordinates
-xp1 = 0
-yp1 = 0
-xp2 = 10
-yp2 = 0
+show_animation = True
 
-# initial value for the estimated state
-X_e = [[x[0]], [y[0]], [theta[0]]]
-X_e_t.append(X_e)
-xr_e = x[0]
-yr_e = y[0]
-theta_r_e = theta[0]
+def motion_model(x, u):
+    """
+    Computes the motion model based on current state and input function.
 
+    :param x: 3x1 pose estimation
+    :param u: 2x1 control input [v; w]
+    :returns: the resulting state after the control function is applied
+    """
+    F = np.array([[1.0, 0, 0],
+                  [0, 1.0, 0],
+                  [0, 0, 1.0]])
 
+    B = np.array([[DT * math.cos(x[2, 0]), 0],
+                  [DT * math.sin(x[2, 0]), 0],
+                  [0.0, DT]])
 
-# Sampling period
-dt = 0.1
+    x = (F @ x) + (B @ u)
+    return x
 
-for i in range(int(N)):
-    
-    # Real Trajectory
-    X = [[x[i]], [y[i]], [theta[i]]]
-     
-    # Predict X(k+1) = f(X(k),U)
-    x_k = xr_e + v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e)) 
-    y_k = yr_e + v[i]/w[i] * (np.cos(theta_r_e) - np.cos(theta_r_e + w[i]*dt))
-    theta_k = theta_r_e + w[i] * dt 
-    X_e = np.array([[x_k], [y_k], [theta_k]])
-    xr_e = x_k
-    yr_e = y_k
-    theta_r_e = theta_k
-
-    # Gradient of f(X)
-    grad_f_X = np.array([[1, 0, v[i]/w[i] * (np.cos(theta_r_e + w[i]*dt) - np.cos(theta_r_e))],
-            [0, 1, v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e))],
-            [0, 0, 1]])
-    
-    # Gradient of f(U)
-    grad_f_U = np.array([[1/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e)), v[i]/(w[i]**2) * (dt*w[i]*np.cos(theta_r_e + w[i]*dt) - np.sin(theta_r_e + w[i]*dt)+ np.sin(theta_r_e))],
-            [1/w[i] * (-np.cos(theta_r_e + w[i]*dt) + np.cos(theta_r_e)), v[i]/(w[i]**2) * (dt*w[i]*np.sin(theta_r_e + w[i]*dt) + np.cos(theta_r_e + w[i]*dt) + np.cos(theta_r_e))],
-            [0, dt]])
-
-    # Covariance propagation
-    P = grad_f_X @ P @ grad_f_X.transpose() + grad_f_U @ Q @ grad_f_U.transpose()
-
-        
-    for j in range(2):
-        if(j == 0):
-            r, psi, xp, yp = r1[i], psi1[i], xp1, yp1
-        else:
-            r, psi, xp, yp = r2[i], psi2[i], xp2, yp2
-
-        # Measures with the actual robot state, z=h(X)
-        distp_e = np.sqrt((xp - xr_e)**2 + (yp - yr_e)**2)
-        psi_p_e = ang_normalized(np.arctan2(yp - yr_e, xp - xr_e) - theta_r_e)
-
-        z_e = np.array([[distp_e],
-                [psi_p_e]])
-    
-        z = np.array([[r],
-                [psi]])
-
-        # Covariance for the measures 
-        R = [[sdv_r**2, 0],
-                [0, sdv_psi**2]]
-               
-
-        # Gradient of h(X)
-        grad_h_X  = np.array([[-((xp - xr_e)/(np.sqrt((xp-xr_e)**2+(yp-yr_e)**2))), -((yp-yr_e)/(np.sqrt((xp-xr_e)**2+(yp-yr_e)**2))), 0],
-                [((yp-yr_e)/((xp-xr_e)**2+(yp-yr_e)**2)), -((xp-xr_e)/((xp-xr_e)**2+(yp-yr_e)**2)), -1]])
-
-        # Kalman Gain
-        k = P @ grad_h_X.transpose() @ np.linalg.inv(grad_h_X @ P @ grad_h_X.transpose() + R)
-
-        # Covariance update
-        P = (np.eye(3)- k @ grad_h_X) @ P
-
-        # State update
-        z_dif = z - z_e
-        z_dif[1] = ang_normalized(z_dif[1])
-        X_e = X_e + k @ (z_dif)
-        X_e[2] = ang_normalized(X_e[2])
-    
-        # Save the results in lists 
-    X_t.append(X) 
-    X_e_t.append(X_e)
-    Zmed.append(z) 
-    Zest.append(z_e)
-    Ks.append(k)
-
-# Initialize empty lists for x and y values
-x_real = []
-y_real = []
-x_est = []
-y_est = []
-
-# Extract x and y values from each array in the list
-for array in X_t:
-    x_real.append(array[0][0])  # Extract x (first element)
-    y_real.append(array[1][0])  # Extract y (second element)
-
-# Extract x and y values from each array in the list
-for array in X_e_t:
-    x_est.append(array[0][0])  # Extract x (first element)
-    y_est.append(array[1][0])  # Extract y (second element)
+def calc_n_LM(x):
+    """
+    Calculates the number of landmarks currently tracked in the state
+    :param x: the state
+    :returns: the number of landmarks n
+    """
+    n = int((len(x) - STATE_SIZE) / LM_SIZE)
+    return n
 
 
+def jacob_motion(x, u):
+    """
+    Calculates the jacobian of motion model.
 
-# Create a function to update the plot in each animation frame
-def update(frame):
-    plt.clf()  # Clear the previous frame
-    plt.subplot(121)  # Subplot on the left
-    plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
-    plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
-    plt.scatter(xp1, yp1, label='Beacon 1 Coordinates', color='yellow', marker='s')
-    plt.scatter(xp2, yp2, label='Beacon 2 Coordinates', color='orange', marker='s')
-    plt.xlabel('X Position')
-    plt.ylabel('Y Position')
-    plt.title('Actual Robot Position Over Time')
-    plt.legend()
-    plt.grid(True)
+    :param x: The state, including the estimated position of the system
+    :param u: The control function
+    :returns: G:  Jacobian
+              Fx: STATE_SIZE x (STATE_SIZE + 2 * num_landmarks) matrix where the left side is an identity matrix
+    """
 
-    plt.subplot(122)  # Subplot on the right
-    plt.scatter(x_real[:frame], y_real[:frame], color='red', label='Real Trajectory', s=5)
-    plt.scatter(x_est[:frame], y_est[:frame], color='green', label='Estimated Trajectory', s=5)
-    plt.text(-5, 0, f'Frame: {frame}', fontsize=12, color='black')  # Add frame number as text
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.legend()
+    # [eye(3) [0 x y; 0 x y; 0 x y]]
+    Fx = np.hstack((np.eye(STATE_SIZE), np.zeros(
+        (STATE_SIZE, LM_SIZE * calc_n_LM(x)))))
 
-# Create a figure with two subplots
-plt.figure(figsize=(12, 6))
+    jF = np.array([[0.0, 0.0, -DT * u[0] * math.sin(x[2, 0])],
+                   [0.0, 0.0, DT * u[0] * math.cos(x[2, 0])],
+                   [0.0, 0.0, 0.0]],dtype=object)
 
-# Create the initial plot
-ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=1)
+    G = np.eye(STATE_SIZE) + Fx.T @ jF @ Fx
+    if calc_n_LM(x) > 0:
+        print(Fx.shape)
+    return G, Fx,
 
-# Show the animation
-plt.show()
+def calc_LM_Pos(x, z):
+    """
+    Calculates the pose in the world coordinate frame of a landmark at the given measurement.
 
-# Create a plot for 'x' vs. 'y'
-plt.figure(figsize=(8, 6))
-plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s = 5)
-plt.scatter(x_est, y_est, label='Robot Position Estimation', color='r', s = 5)
-plt.xlabel('X Position')
-plt.ylabel('Y Position')
-plt.title('Actual Robot Position Over Time')
-plt.legend()
-plt.grid(True)
-plt.show()
+    :param x: [x; y; theta]
+    :param z: [range; bearing]
+    :returns: [x; y] for given measurement
+    """
+    zp = np.zeros((2, 1))
 
+    zp[0, 0] = x[0, 0] + z[0] * math.cos(x[2, 0] + z[1])
+    zp[1, 0] = x[1, 0] + z[0] * math.sin(x[2, 0] + z[1])
+    #zp[0, 0] = x[0, 0] + z[0, 0] * math.cos(x[2, 0] + z[0, 1])
+    #zp[1, 0] = x[1, 0] + z[0, 0] * math.sin(x[2, 0] + z[0, 1])
+
+    return zp
+
+
+def get_LM_Pos_from_state(x, ind):
+    """
+    Returns the position of a given landmark
+
+    :param x:   The state containing all landmark positions
+    :param ind: landmark id
+    :returns:   The position of the landmark
+    """
+    lm = x[STATE_SIZE + LM_SIZE * ind: STATE_SIZE + LM_SIZE * (ind + 1), :]
+
+    return lm
+
+
+def search_correspond_LM_ID(xAug, PAug, zi):
+    """
+    Landmark association with Mahalanobis distance.
+
+    If this landmark is at least M_DIST_TH units away from all known landmarks,
+    it is a NEW landmark.
+
+    :param xAug: The estimated state
+    :param PAug: The estimated covariance
+    :param zi:   the read measurements of specific landmark
+    :returns:    landmark id
+    """
+
+    nLM = calc_n_LM(xAug)
+
+    mdist = []
+
+    for i in range(nLM):
+        lm = get_LM_Pos_from_state(xAug, i)
+        y, S, H = calc_innovation(lm, xAug, PAug, zi, i)
+        mdist.append(y.T @ np.linalg.inv(S) @ y)
+
+    mdist.append(M_DIST_TH)  # new landmark
+
+    minid = mdist.index(min(mdist))
+
+    return minid
+
+def calc_input():
+    v = 1.0  # [m/s]
+    yawrate = 0.1  # [rad/s]
+    u = np.array([[v, yawrate]]).T
+    return u
+
+def pi_2_pi(angle):
+    return (angle + math.pi) % (2 * math.pi) - math.pi
+
+def calc_innovation(lm, xEst, PEst, z, LMid):
+    """
+    Calculates the innovation based on expected position and landmark position
+
+    :param lm:   landmark position
+    :param xEst: estimated position/state
+    :param PEst: estimated covariance
+    :param z:    read measurements
+    :param LMid: landmark id
+    :returns:    returns the innovation y, and the jacobian H, and S, used to calculate the Kalman Gain
+    """
+    delta = lm - xEst[0:2]
+    q = (delta.T @ delta)[0, 0]
+    zangle = math.atan2(delta[1, 0], delta[0, 0]) - xEst[2, 0]
+    zp = np.array([[math.sqrt(q), pi_2_pi(zangle)]])
+    # zp is the expected measurement based on xEst and the expected landmark position
+
+    y = (z - zp).T # y = innovation
+    y[1] = pi_2_pi(y[1])
+
+    H = jacobH(q, delta, xEst, LMid + 1)
+    S = H @ PEst @ H.T + Cx[0:2, 0:2]
+
+    return y, S, H
+
+def observation(xTrue, xd, u, RFID):
+    """
+    :param xTrue: the true pose of the system
+    :param xd:    the current noisy estimate of the system
+    :param u:     the current control input
+    :param RFID:  the true position of the landmarks
+
+    :returns:     Computes the true position, observations, dead reckoning (noisy) position,
+                  and noisy control function
+    """
+    xTrue = motion_model(xTrue, u)
+
+    # add noise to gps x-y
+    z = np.zeros((0, 3))
+
+    for i in range(len(RFID[:, 0])): # Test all beacons, only add the ones we can see (within MAX_RANGE)
+
+        dx = RFID[i, 0] - xTrue[0, 0]
+        dy = RFID[i, 1] - xTrue[1, 0]
+        d = math.sqrt(dx**2 + dy**2)
+        angle = pi_2_pi(math.atan2(dy, dx) - xTrue[2, 0])
+        if d <= MAX_RANGE:
+            dn = d + np.random.randn() * Qsim[0, 0]  # add noise
+            anglen = angle + np.random.randn() * Qsim[1, 1]  # add noise
+            zi = np.array([dn, anglen, i])
+            z = np.vstack((z, zi))
+
+    # add noise to input
+    ud = np.array([[
+        u[0, 0] + np.random.randn() * Rsim[0, 0],
+        u[1, 0] + np.random.randn() * Rsim[1, 1]]]).T
+
+    xd = motion_model(xd, ud)
+
+    return xTrue, z, xd, ud
+
+def jacobH(q, delta, x, i):
+    """
+    Calculates the jacobian of the measurement function
+
+    :param q:     the range from the system pose to the landmark
+    :param delta: the difference between a landmark position and the estimated system position
+    :param x:     the state, including the estimated system position
+    :param i:     landmark id + 1
+    :returns:     the jacobian H
+    """
+    sq = math.sqrt(q)
+    G = np.array([[-sq * delta[0, 0], - sq * delta[1, 0], 0, sq * delta[0, 0], sq * delta[1, 0]],
+                  [delta[1, 0], - delta[0, 0], - q, - delta[1, 0], delta[0, 0]]])
+
+    G = G / q
+    nLM = calc_n_LM(x)
+    F1 = np.hstack((np.eye(3), np.zeros((3, 2 * nLM))))
+    F2 = np.hstack((np.zeros((2, 3)), np.zeros((2, 2 * (i - 1))),
+                    np.eye(2), np.zeros((2, 2 * nLM - 2 * i))))
+
+    F = np.vstack((F1, F2))
+
+    H = G @ F
+
+    return H
+
+def predict(xEst, PEst, u):
+    """
+    Performs the prediction step of EKF SLAM
+
+    :param xEst: nx1 state vector
+    :param PEst: nxn covariance matrix
+    :param u:    2x1 control vector
+    :returns:    predicted state vector, predicted covariance, jacobian of control vector, transition fx
+    """
+    S = STATE_SIZE
+    G, Fx = jacob_motion(xEst[0:S], u)
+    xEst[0:S] = motion_model(xEst[0:S], u)
+    # Fx is an an identity matrix of size (STATE_SIZE)
+    # sigma = G*sigma*G.T + Noise
+    PEst[0:S, 0:S] = G.T @ PEst[0:S, 0:S] @ G + Fx.T @ Cx @ Fx
+    return xEst, PEst, G, Fx
+
+def update(xEst, PEst, u, z, initP):
+    """
+    Performs the update step of EKF SLAM
+
+    :param xEst:  nx1 the predicted pose of the system and the pose of the landmarks
+    :param PEst:  nxn the predicted covariance
+    :param u:     2x1 the control function
+    :param z:     the measurements read at new position
+    :param initP: 2x2 an identity matrix acting as the initial covariance
+    :returns:     the updated state and covariance for the system
+    """
+    for iz in range(len(z[:, 0])):  # for each observation
+        minid = search_correspond_LM_ID(xEst, PEst, z[iz, 0:2]) # associate to a known landmark
+
+        nLM = calc_n_LM(xEst) # number of landmarks we currently know about
+
+        if minid == nLM: # Landmark is a NEW landmark
+            print("New LM")
+            # Extend state and covariance matrix
+            xAug = np.vstack((xEst, calc_LM_Pos(xEst, z[iz, :])))
+            PAug = np.vstack((np.hstack((PEst, np.zeros((len(xEst), LM_SIZE)))),
+                              np.hstack((np.zeros((LM_SIZE, len(xEst))), initP))))
+            xEst = xAug
+            PEst = PAug
+
+        lm = get_LM_Pos_from_state(xEst, minid)
+        y, S, H = calc_innovation(lm, xEst, PEst, z[iz, 0:2], minid)
+
+        K = (PEst @ H.T) @ np.linalg.inv(S) # Calculate Kalman Gain
+        xEst = xEst + (K @ y)
+        PEst = (np.eye(len(xEst)) - (K @ H)) @ PEst
+
+    xEst[2] = pi_2_pi(xEst[2])
+    return xEst, PEst
+
+def ekf_slam(xEst, PEst, u, z):
+    """
+    Performs an iteration of EKF SLAM from the available information.
+
+    :param xEst: the belief in last position
+    :param PEst: the uncertainty in last position
+    :param u:    the control function applied to the last position
+    :param z:    measurements at this step
+    :returns:    the next estimated position and associated covariance
+    """
+    S = STATE_SIZE
+
+    # Predict
+    xEst, PEst, G, Fx = predict(xEst, PEst, u)
+    initP = np.eye(2)
+
+    # Update
+    xEst, PEst = update(xEst, PEst, u, z, initP)
+
+    return xEst, PEst
+
+def main():
+    print(" start!!")
+
+    time = 0.0
+
+    # RFID positions [x, y]
+    RFID = np.array([[10.0, -2.0],
+                     [15.0, 10.0],
+                     [3.0, 15.0],
+                     [-5.0, 20.0]])
+
+    # State Vector [x y yaw v]'
+    xEst = np.zeros((STATE_SIZE, 1))
+    xTrue = np.zeros((STATE_SIZE, 1))
+    PEst = np.eye(STATE_SIZE)
+
+    xDR = np.zeros((STATE_SIZE, 1))  # Dead reckoning
+
+    # history
+    hxEst = xEst
+    hxTrue = xTrue
+    hxDR = xTrue
+
+    while SIM_TIME >= time:
+        time += DT
+        u = calc_input()
+
+        xTrue, z, xDR, ud = observation(xTrue, xDR, u, RFID)
+
+        xEst, PEst = ekf_slam(xEst, PEst, ud, z)
+
+        x_state = xEst[0:STATE_SIZE]
+
+        # store data history
+        hxEst = np.hstack((hxEst, x_state))
+        hxDR = np.hstack((hxDR, xDR))
+        hxTrue = np.hstack((hxTrue, xTrue))
+
+        if show_animation:  # pragma: no cover
+            plt.cla()
+
+            plt.plot(RFID[:, 0], RFID[:, 1], "*k")
+            plt.plot(xEst[0], xEst[1], ".r")
+
+            # plot landmark
+            for i in range(calc_n_LM(xEst)):
+                plt.plot(xEst[STATE_SIZE + i * 2],
+                         xEst[STATE_SIZE + i * 2 + 1], "xg")
+
+            plt.plot(hxTrue[0, :],
+                     hxTrue[1, :], "-b")
+            plt.plot(hxDR[0, :],
+                     hxDR[1, :], "-k")
+            plt.plot(hxEst[0, :],
+                     hxEst[1, :], "-r")
+            plt.axis("equal")
+            plt.grid(True)
+            plt.pause(0.001)
+
+if __name__ == "__main__":
+
+    main()
