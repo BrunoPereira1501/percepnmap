@@ -71,7 +71,7 @@ psi = [row['psi'] for row in data_list]
 
 # Covariances
 Q = np.array([[0.5**2, 0],
-     [0, 0.05**2 ]])
+     [0, 0.05**2]])
 
 # Std for the beacons 
 sdv_r = 0.5
@@ -112,79 +112,151 @@ for i in range(int(N)):
     X = [[x[i]], [y[i]], [theta[i]]]
      
     # Predict X(k+1) = f(X(k),U)
-    x_k = xr_e + v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e)) 
-    y_k = yr_e + v[i]/w[i] * (np.cos(theta_r_e) - np.cos(theta_r_e + w[i]*dt))
-    theta_k = theta_r_e + w[i] * dt 
+    xr_e = X_e[0][0]
+    yr_e = X_e[1][0]
+    theta_r_e = X_e[2][0]
 
-    X_e = np.array([[x_k], [y_k], [theta_k]])
+    mat = np.eye(3)
+    zero_columns = np.zeros((mat.shape[0], nr_landmarks*2))
+    FxT = np.hstack((mat, zero_columns))
 
-    xr_e = x_k
-    yr_e = y_k
-    theta_r_e = theta_k
+    Mot = np.array([[v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e))],
+            [v[i]/w[i] * (np.cos(theta_r_e) - np.cos(theta_r_e + w[i]*dt))],
+            [w[i] * dt]])  
+    
+    X_e = X_e + FxT * Mot
 
     # Gradient of f(X)
     grad_f_X = np.array([[1, 0, v[i]/w[i] * (np.cos(theta_r_e + w[i]*dt) - np.cos(theta_r_e))],
             [0, 1, v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e))],
             [0, 0, 1]])
     
+    if(state_dim == 3):
+        Gt = grad_f_X
+    else:
+        expanded = np.eye((state_dim))
+        expanded[0:state_dim-2, :state_dim-2] = grad_f_X
+        Gt = expanded
+    
     # Gradient of f(U)
     grad_f_U = np.array([[1/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e)), v[i]/(w[i]**2) * (dt*w[i]*np.cos(theta_r_e + w[i]*dt) - np.sin(theta_r_e + w[i]*dt)+ np.sin(theta_r_e))],
             [1/w[i] * (-np.cos(theta_r_e + w[i]*dt) + np.cos(theta_r_e)), v[i]/(w[i]**2) * (dt*w[i]*np.sin(theta_r_e + w[i]*dt) + np.cos(theta_r_e + w[i]*dt) - np.cos(theta_r_e))],
             [0, dt]])
+    
+    if(nr_landmarks == 0):
+        Ut = grad_f_U
+    else:
+        zero_rows = np.zeros((nr_landmarks*2, 3))
+        Ut = np.hstack((grad_f_U, zero_rows))
 
     # Covariance propagation
-    P = grad_f_X @ P @ grad_f_X.transpose() + grad_f_U @ Q @ grad_f_U.transpose()
+    P = Gt @ P @ Gt.T + Ut @ Q @ Ut.T
 
     if(r[i] != 0.0):    
-        landmark_x = X_e[0][0] + r[i] * np.cos(psi[i] + X_e[2][0])
-        landmark_y = X_e[1][0] + r[i] * np.sin(psi[i] + X_e[2][0])
+       
+        landmark_loc = np.array([[X_e[0][0] + r[i] * np.cos(psi[i] + X_e[2][0])],
+                                 [X_e[1][0] + r[i] * np.sin(psi[i] + X_e[2][0])]])
 
         if(nr_landmarks == 0):
-            landmarks.append([landmark_x, landmark_y])
+
+            landmarks.append(landmark_loc)
             nr_landmarks += 1
             state_dim = 3 + 2 * nr_landmarks
-            #X_e = np.vstack((X_e, [0], [0]))
+            X_e = np.vstack((X_e, landmark_loc))
             expanded = np.eye((state_dim))
             expanded[0:state_dim-2, :state_dim-2] = P
             P = expanded
 
-        #elif(condição para ver qual beacon está a ver)
-    
-    distp_e = np.sqrt((landmark_x - X_e[0][0])**2 + (landmark_y - X_e[1][0])**2)
-    psi_p_e = ang_normalized(np.arctan2(landmark_y - X_e[1][0], landmark_x - X_e[0][0]) - X_e[2][0])
+            distp_e = np.sqrt((landmark_loc[0][0] - X_e[0][0])**2 + (landmark_loc[1][0] - X_e[1][0])**2)
+            psi_p_e = ang_normalized(np.arctan2(landmark_loc[1][0] - X_e[1][0], landmark_loc[0][0] - X_e[0][0]) - X_e[2][0])
 
-    z_e = np.array([[distp_e],
-            [psi_p_e]])
-    
-    z = np.array([[r[i]],
-            [psi[i]]])
-    
-    # Covariance for the measures 
-    R = [[sdv_r**2, 0],
-            [0, sdv_psi**2]]
+            z_e = np.array([[distp_e],
+                    [psi_p_e]])
 
-    # Gradient of h(X)
-    grad_h_X  = np.array([[-((landmark_x - X_e[0][0])/(np.sqrt((landmark_x-X_e[0][0])**2+(landmark_y-X_e[1][0])**2))), -((landmark_y-X_e[1][0])/(np.sqrt((landmark_x-X_e[0][0])**2+(landmark_y-X_e[1][0])**2))), 0],
-            [((landmark_y-X_e[1][0])/((landmark_x-X_e[0][0])**2+(landmark_y-X_e[1][0])**2)), -((landmark_x-X_e[0][0])/((landmark_x-X_e[0][0])**2+(landmark_y-X_e[1][0])**2)), -1]])
-        
-    # Kalman Gain
-    k = P @ grad_h_X.transpose() @ np.linalg.inv(grad_h_X @ P @ grad_h_X.transpose() + R)
+            z = np.array([[r[i]],
+                    [psi[i]]])
 
-    # Covariance update
-    P = (np.eye(3)- k @ grad_h_X) @ P
-    
-    # State update
-    z_dif = z - z_e
-    z_dif[1] = ang_normalized(z_dif[1])
-    X_e = X_e + k @ (z_dif)
-    X_e[2] = ang_normalized(X_e[2])
+            # Covariance for the measures 
+            R = [[sdv_r**2, 0],
+                    [0, sdv_psi**2]]
 
-    # Save the results in lists 
-    X_t.append(X) 
-    X_e_t.append(X_e)
-    Zmed.append(z) 
-    Zest.append(z_e)
-    Ks.append(k)
+            # Gradient of h(X)
+            grad_h_X  = np.array([[-((landmark_loc[0][0] - X_e[0][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), -((landmark_loc[1][0]-X_e[1][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), 0, ((landmark_loc[0][0] - X_e[0][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), ((landmark_loc[1][0]-X_e[1][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)))],
+                    [((landmark_loc[1][0]-X_e[1][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), -((landmark_loc[0][0]-X_e[0][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), -1, -((landmark_loc[1][0]-X_e[1][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), ((landmark_loc[0][0]-X_e[0][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))]])
+            
+            FxJ = grad_h_X
+       
+            # Kalman Gain
+            k = P @ FxJ.take @ np.linalg.inv(FxJ @ P @ grad_h_X.transpose() + R)
+
+            # Covariance update
+            P = (np.eye(3)- k @ grad_h_X) @ P
+
+            # State update
+            z_dif = z - z_e
+            z_dif[1] = ang_normalized(z_dif[1])
+            X_e = X_e + k @ (z_dif)
+            X_e[2] = ang_normalized(X_e[2])
+
+            # Save the results in lists 
+            X_t.append(X) 
+            X_e_t.append(X_e)
+            Zmed.append(z) 
+            Zest.append(z_e)
+            Ks.append(k)
+
+        else:
+            for landmark, j in zip(landmarks, arange(0, nr_landmarks)):
+                
+                tol = 0.5
+                if((landmark[0] - 3 * tol < landmark_loc[0][0] < landmark[0] + 3 * tol) and (landmark[1] - 3 * tol < landmark_loc[1][0] < landmark[1] + 3 * tol)):
+                    
+                        distp_e = np.sqrt((landmark_loc[0][0] - X_e[0][0])**2 + (landmark_loc[1][0] - X_e[1][0])**2)
+                        psi_p_e = ang_normalized(np.arctan2(landmark_loc[1][0] - X_e[1][0], landmark_loc[0][0] - X_e[0][0]) - X_e[2][0])
+
+                        z_e = np.array([[distp_e],
+                                [psi_p_e]])
+
+                        z = np.array([[r[i]],
+                                [psi[i]]])
+
+                        # Covariance for the measures 
+                        R = [[sdv_r**2, 0],
+                                [0, sdv_psi**2]]
+
+                        # Gradient of h(X)
+                        grad_h_X  = np.array([[-((landmark_loc[0][0] - X_e[0][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), -((landmark_loc[1][0]-X_e[1][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), 0, ((landmark_loc[0][0] - X_e[0][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), ((landmark_loc[1][0]-X_e[1][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)))],
+                                [((landmark_loc[1][0]-X_e[1][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), -((landmark_loc[0][0]-X_e[0][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), -1, -((landmark_loc[1][0]-X_e[1][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), ((landmark_loc[0][0]-X_e[0][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))]])
+                        
+                        if(nr_landmarks == 1):
+                            FxJ = grad_h_X
+                        else:
+                            iden = np.eye(5)
+                            zero_mat_before = np.zeros((5, 2*j-2))
+                            zero_mat_after = np.zeros((5, 2*nr_landmarks-2*j))
+                            FxJ = np.insert(iden, [3], zero_mat_before, axis = 1)
+                            FxJ = np.insert(FxJ, [5 + (2*j-2)], zero_mat_after, axis = 1)
+
+                        # Kalman Gain
+                        k = P @ FxJ.take @ np.linalg.inv(FxJ @ P @ grad_h_X.transpose() + R)
+
+                        # Covariance update
+                        P = (np.eye(3)- k @ grad_h_X) @ P
+
+                        # State update
+                        z_dif = z - z_e
+                        z_dif[1] = ang_normalized(z_dif[1])
+                        X_e = X_e + k @ (z_dif)
+                        X_e[2] = ang_normalized(X_e[2])
+
+
+
+                        # Save the results in lists 
+                        X_t.append(X) 
+                        X_e_t.append(X_e)
+                        Zmed.append(z) 
+                        Zest.append(z_e)
+                        Ks.append(k)
 
 # Initialize empty lists for x and y values
 x_real = []
