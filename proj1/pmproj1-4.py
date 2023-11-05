@@ -120,11 +120,13 @@ for i in range(int(N)):
     zero_columns = np.zeros((mat.shape[0], nr_landmarks*2))
     FxT = np.hstack((mat, zero_columns))
 
+
     Mot = np.array([[v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e))],
             [v[i]/w[i] * (np.cos(theta_r_e) - np.cos(theta_r_e + w[i]*dt))],
             [w[i] * dt]])  
     
-    X_e = X_e + FxT * Mot
+    X_e = X_e + FxT.T @ Mot
+    
 
     # Gradient of f(X)
     grad_f_X = np.array([[1, 0, v[i]/w[i] * (np.cos(theta_r_e + w[i]*dt) - np.cos(theta_r_e))],
@@ -146,12 +148,13 @@ for i in range(int(N)):
     if(nr_landmarks == 0):
         Ut = grad_f_U
     else:
-        zero_rows = np.zeros((nr_landmarks*2, 3))
-        Ut = np.hstack((grad_f_U, zero_rows))
+        zero_rows = np.zeros((nr_landmarks*2, 2))
+        Ut = np.vstack((grad_f_U, zero_rows))
 
     # Covariance propagation
     P = Gt @ P @ Gt.T + Ut @ Q @ Ut.T
 
+    print(X_e)
     if(r[i] != 0.0):    
        
         landmark_loc = np.array([[X_e[0][0] + r[i] * np.cos(psi[i] + X_e[2][0])],
@@ -162,8 +165,9 @@ for i in range(int(N)):
             landmarks.append(landmark_loc)
             nr_landmarks += 1
             state_dim = 3 + 2 * nr_landmarks
+
             X_e = np.vstack((X_e, landmark_loc))
-            expanded = np.eye((state_dim))
+            expanded = np.eye(state_dim) * 10
             expanded[0:state_dim-2, :state_dim-2] = P
             P = expanded
 
@@ -187,10 +191,10 @@ for i in range(int(N)):
             FxJ = grad_h_X
        
             # Kalman Gain
-            k = P @ FxJ.take @ np.linalg.inv(FxJ @ P @ grad_h_X.transpose() + R)
-
+            k = P @ FxJ.T @ np.linalg.inv(FxJ @ P @ FxJ.T + R)
+        
             # Covariance update
-            P = (np.eye(3)- k @ grad_h_X) @ P
+            P = (np.eye(state_dim) - k @ FxJ) @ P
 
             # State update
             z_dif = z - z_e
@@ -206,8 +210,7 @@ for i in range(int(N)):
             Ks.append(k)
 
         else:
-            for landmark, j in zip(landmarks, arange(0, nr_landmarks)):
-                
+            for landmark, j in zip(landmarks, arange(1, nr_landmarks)):
                 tol = 0.5
                 if((landmark[0] - 3 * tol < landmark_loc[0][0] < landmark[0] + 3 * tol) and (landmark[1] - 3 * tol < landmark_loc[1][0] < landmark[1] + 3 * tol)):
                     
@@ -236,12 +239,13 @@ for i in range(int(N)):
                             zero_mat_after = np.zeros((5, 2*nr_landmarks-2*j))
                             FxJ = np.insert(iden, [3], zero_mat_before, axis = 1)
                             FxJ = np.insert(FxJ, [5 + (2*j-2)], zero_mat_after, axis = 1)
+                            FxJ = grad_h_X * FxJ
 
                         # Kalman Gain
-                        k = P @ FxJ.take @ np.linalg.inv(FxJ @ P @ grad_h_X.transpose() + R)
+                        k = P @ FxJ.T @ np.linalg.inv(FxJ @ P @ FxJ.T + R)
 
                         # Covariance update
-                        P = (np.eye(3)- k @ grad_h_X) @ P
+                        P = (np.eye(state_dim) - k @ FxJ) @ P
 
                         # State update
                         z_dif = z - z_e
@@ -249,14 +253,68 @@ for i in range(int(N)):
                         X_e = X_e + k @ (z_dif)
                         X_e[2] = ang_normalized(X_e[2])
 
-
-
                         # Save the results in lists 
                         X_t.append(X) 
                         X_e_t.append(X_e)
                         Zmed.append(z) 
                         Zest.append(z_e)
                         Ks.append(k)
+                else:
+                    landmarks.append(landmark_loc)
+                    nr_landmarks += 1
+                    state_dim = 3 + 2 * nr_landmarks
+                    X_e = np.vstack((X_e, landmark_loc))
+                    expanded = np.eye(state_dim) *10
+                    expanded[0:state_dim-2, :state_dim-2] = P
+                    P = expanded
+
+                    distp_e = np.sqrt((landmark_loc[0][0] - X_e[0][0])**2 + (landmark_loc[1][0] - X_e[1][0])**2)
+                    psi_p_e = ang_normalized(np.arctan2(landmark_loc[1][0] - X_e[1][0], landmark_loc[0][0] - X_e[0][0]) - X_e[2][0])
+
+                    z_e = np.array([[distp_e],
+                            [psi_p_e]])
+
+                    z = np.array([[r[i]],
+                            [psi[i]]])
+
+                    # Covariance for the measures 
+                    R = [[sdv_r**2, 0],
+                            [0, sdv_psi**2]]
+
+                    # Gradient of h(X)
+                    grad_h_X  = np.array([[-((landmark_loc[0][0] - X_e[0][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), -((landmark_loc[1][0]-X_e[1][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), 0, ((landmark_loc[0][0] - X_e[0][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), ((landmark_loc[1][0]-X_e[1][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)))],
+                            [((landmark_loc[1][0]-X_e[1][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), -((landmark_loc[0][0]-X_e[0][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), -1, -((landmark_loc[1][0]-X_e[1][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), ((landmark_loc[0][0]-X_e[0][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))]])
+                    
+                    if(nr_landmarks == 1):
+                        FxJ = grad_h_X
+                    else:
+                        iden = np.eye(5)
+                        zero_mat_before = np.zeros((5, 2*(j-2)))
+                        zero_mat_after = np.zeros((5, 2*nr_landmarks-2*j))
+                        FxJ = np.insert(iden, [3], zero_mat_before, axis = 1)
+                        FxJ = np.insert(FxJ, [5 + (2*j-2)], zero_mat_after, axis = 1)
+                        FxJ = grad_h_X * FxJ
+
+                    # Kalman Gain
+                    k = P @ FxJ.T @ np.linalg.inv(FxJ @ P @ FxJ.T + R)
+
+                    # Covariance update
+                    P = (np.eye(state_dim) - k @ FxJ) @ P
+
+                    # State update
+                    z_dif = z - z_e
+                    z_dif[1] = ang_normalized(z_dif[1])
+                    X_e = X_e + k @ (z_dif)
+                    X_e[2] = ang_normalized(X_e[2])
+
+                    # Save the results in lists 
+                    X_t.append(X) 
+                    X_e_t.append(X_e)
+                
+                    Zmed.append(z) 
+                    Zest.append(z_e)
+                    Ks.append(k)
+
 
 # Initialize empty lists for x and y values
 x_real = []
@@ -282,7 +340,7 @@ def update(frame):
     plt.subplot(121)  # Subplot on the left
     plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
     plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
-    plt.scatter(landmark_x, landmark_y, label='Beacon 1 Coordinates', color='yellow', marker='s')
+    #plt.scatter(landmark_x, landmark_y, label='Beacon 1 Coordinates', color='yellow', marker='s')
     plt.xlabel('X Position')
     plt.ylabel('Y Position')
     plt.title('Actual Robot Position Over Time')
