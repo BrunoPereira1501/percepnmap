@@ -132,15 +132,16 @@ for i in range(int(N)):
     # Covariance propagation
     P = grad_f_X @ P @ grad_f_X.transpose() + grad_f_U @ Q @ grad_f_U.transpose()
 
-    distb1 = np.sqrt((xk - xp1)**2 + (yk- yp1)**2) 
-    distb2 = np.sqrt((xk - xp2)**2 + (yk- yp2)**2)
+    landmark_loc = np.array([[X_e[0][0] + r[i] * np.cos(psi[i] + X_e[2][0])],
+                                 [X_e[1][0] + r[i] * np.sin(psi[i] + X_e[2][0])]])
+
 
     if(r[i] == 0):
         beacon1 = False
         beacon2 = False
         B.append(0)
 
-    elif (abs(distb1 -  r[i]) < abs(distb2 - r[i])):
+    elif (abs(0 - landmark_loc[0][0]) < abs(10 - landmark_loc[0][0])):
         beacon1 = True
         beacon2 = False
         B.append(1)
@@ -276,8 +277,8 @@ plt.show()
 
 # Create a plot for 'x' vs. 'y'
 plt.figure(figsize=(8, 6))
-plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s = 5)
-plt.scatter(x_est, y_est, label='Robot Position Estimation', color='r', s = 5)
+plt.plot(x_real, y_real, label='Real Robot Position', color='b')
+plt.plot(x_est, y_est, label='Robot Position Estimation', color='r')
 plt.xlabel('X Position')
 plt.ylabel('Y Position')
 plt.title('Actual Robot Position Over Time')

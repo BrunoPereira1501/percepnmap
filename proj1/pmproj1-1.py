@@ -30,7 +30,7 @@ Ks = []
 data_list = []
 
 # Open the data file for reading
-with open('Datasets-20231106/data1.txt', 'r') as file:
+with open('Datasets-20231106\data1.txt', 'r') as file:
     for line in file:
         # Split the line into individual values using spaces as the delimiter
         values = line.split()
@@ -193,7 +193,6 @@ for array in X_e_t:
     y_est.append(array[1])  # Extract y (second element)
 
 
-print(X_e)
 # # Create a function to update the plot in each animation frame
 # def update(frame):
 #     plt.clf()  # Clear the previous frame
@@ -225,12 +224,10 @@ print(X_e)
 # # Show the animation
 # plt.show()
 
-print(x_est)
-
 # Create a plot for 'x' vs. 'y'
 plt.figure(figsize=(8, 6))
-plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s = 5)
-plt.scatter(x_est, y_est, label='Robot Position Estimation', color='r', s = 5)
+plt.plot(x_real, y_real, label='Real Robot Position', color='b')
+plt.plot(x_est, y_est, label='Robot Position Estimation', color='r')
 plt.xlabel('X Position')
 plt.ylabel('Y Position')
 plt.title('Actual Robot Position Over Time')

@@ -21,15 +21,12 @@ N = 2000
 # Lists for the results 
 X_t = []
 X_e_t = []
-Zmed = []
-Zest = []
-Ks = []
 
 # Initialize an empty list to store the data
 data_list = []
 
 # Open the data file for reading
-with open('Datasets-20231026/data1.txt', 'r') as file:
+with open('Datasets-20231026\data4.txt', 'r') as file:
     for line in file:
         # Split the line into individual values using spaces as the delimiter
         values = line.split()
@@ -93,9 +90,7 @@ yp2 = 0
 # initial value for the estimated state
 X_e = [[0], [0], [0]]
 X_e_t.append(X_e)
-xr_e = 0
-yr_e = 0
-theta_r_e = 0
+
 
 # Create list for landmarks
 landmarks = []
@@ -112,9 +107,9 @@ for i in range(int(N)):
     X = [[x[i]], [y[i]], [theta[i]]]
      
     # Predict X(k+1) = f(X(k),U)
-    xr_e = X_e[0][0]
-    yr_e = X_e[1][0]
-    theta_r_e = X_e[2][0]
+    xr_e = X_e_t[i][0][0]
+    yr_e = X_e_t[i][1][0]
+    theta_r_e = X_e_t[i][2][0]
 
     mat = np.eye(3)
     zero_columns = np.zeros((mat.shape[0], nr_landmarks*2))
@@ -137,7 +132,7 @@ for i in range(int(N)):
         Gt = grad_f_X
     else:
         expanded = np.eye((state_dim))
-        expanded[0:state_dim-2, :state_dim-2] = grad_f_X
+        expanded[0:3, 0:3] = grad_f_X
         Gt = expanded
     
     # Gradient of f(U)
@@ -158,6 +153,7 @@ for i in range(int(N)):
        
         landmark_loc = np.array([[X_e[0][0] + r[i] * np.cos(psi[i] + X_e[2][0])],
                                  [X_e[1][0] + r[i] * np.sin(psi[i] + X_e[2][0])]])
+        
 
         if(nr_landmarks == 0):
 
@@ -201,63 +197,56 @@ for i in range(int(N)):
             X_e = X_e + k @ (z_dif)
             X_e[2] = ang_normalized(X_e[2])
 
-            # Save the results in lists 
-            X_t.append(X) 
-            X_e_t.append(X_e)
-            Zmed.append(z) 
-            Zest.append(z_e)
-            Ks.append(k)
-
         else:
-            for landmark, j in zip(landmarks, arange(1, nr_landmarks)):
-                tol = 0.1
-                if((landmark[0] - 3 * tol < landmark_loc[0][0] < landmark[0] + 3 * tol) and (landmark[1] - 3 * tol < landmark_loc[1][0] < landmark[1] + 3 * tol)):
+            for landmark, j in zip(landmarks, range(1, nr_landmarks+1)):
+              
+                #print(landmark_loc[0][0], landmark[0], landmark_loc[0][0] - landmark[0], abs(landmark_loc[0][0] - landmark[0]))
+                #print(landmark_loc[1][0], landmark[1], landmark_loc[1][0] - landmark[1], abs(landmark_loc[1][0] - landmark[1]))
+                #print(landmark)
+
+                if((abs(landmark_loc[0][0] - landmark[0]) < 1.5) and (abs(landmark_loc[1][0] - landmark[1]) < 1.5)):
                     
-                        distp_e = np.sqrt((landmark_loc[0][0] - X_e[0][0])**2 + (landmark_loc[1][0] - X_e[1][0])**2)
-                        psi_p_e = ang_normalized(np.arctan2(landmark_loc[1][0] - X_e[1][0], landmark_loc[0][0] - X_e[0][0]) - X_e[2][0])
+                    distp_e = np.sqrt((landmark_loc[0][0] - X_e[0][0])**2 + (landmark_loc[1][0] - X_e[1][0])**2)
+                    psi_p_e = ang_normalized(np.arctan2(landmark_loc[1][0] - X_e[1][0], landmark_loc[0][0] - X_e[0][0]) - X_e[2][0])
 
-                        z_e = np.array([[distp_e],
-                                [psi_p_e]])
+                    z_e = np.array([[distp_e],
+                            [psi_p_e]])
 
-                        z = np.array([[r[i]],
-                                [psi[i]]])
+                    z = np.array([[r[i]],
+                            [psi[i]]])
 
-                        # Covariance for the measures 
-                        R = [[sdv_r**2, 0],
-                                [0, sdv_psi**2]]
+                    # Covariance for the measures 
+                    R = [[sdv_r**2, 0],
+                            [0, sdv_psi**2]]
 
-                        # Gradient of h(X)
-                        grad_h_X  = np.array([[-((landmark_loc[0][0] - X_e[0][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), -((landmark_loc[1][0]-X_e[1][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), 0, ((landmark_loc[0][0] - X_e[0][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), ((landmark_loc[1][0]-X_e[1][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)))],
-                                [((landmark_loc[1][0]-X_e[1][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), -((landmark_loc[0][0]-X_e[0][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), -1, -((landmark_loc[1][0]-X_e[1][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), ((landmark_loc[0][0]-X_e[0][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))]])
-                        
-                        if(nr_landmarks == 1):
-                            FxJ = grad_h_X
-                        else:
-                            iden = np.eye(5)
-                            zero_mat_before = np.zeros((5, 2*j-2))
-                            zero_mat_after = np.zeros((5, 2*nr_landmarks-2*j))
-                            FxJ = np.insert(iden, [3], zero_mat_before, axis = 1)
-                            FxJ = np.insert(FxJ, [5 + (2*j-2)], zero_mat_after, axis = 1)
-                            FxJ = grad_h_X * FxJ
+                    # Gradient of h(X)
+                    grad_h_X  = np.array([[-((landmark_loc[0][0] - X_e[0][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), -((landmark_loc[1][0]-X_e[1][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), 0, ((landmark_loc[0][0] - X_e[0][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))), ((landmark_loc[1][0]-X_e[1][0])/(np.sqrt((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)))],
+                            [((landmark_loc[1][0]-X_e[1][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), -((landmark_loc[0][0]-X_e[0][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), -1, -((landmark_loc[1][0]-X_e[1][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2)), ((landmark_loc[0][0]-X_e[0][0])/((landmark_loc[0][0]-X_e[0][0])**2+(landmark_loc[1][0]-X_e[1][0])**2))]])
+                    
+                    if(nr_landmarks == 1):
+                        FxJ = grad_h_X
+                    else:
+                        iden = np.eye(5)
+                        zero_mat_before = np.zeros((5, 2*j-2))
+                        zero_mat_after = np.zeros((5, 2*nr_landmarks-2*j))
+                        FxJ = np.insert(iden, [3], zero_mat_before, axis = 1)
+                        FxJ = np.insert(FxJ, [5 + (2*j-2)], zero_mat_after, axis = 1)
+                        FxJ = grad_h_X @ FxJ
 
-                        # Kalman Gain
-                        k = P @ FxJ.T @ np.linalg.inv(FxJ @ P @ FxJ.T + R)
+                    # Kalman Gain
+                    k = P @ FxJ.T @ np.linalg.inv(FxJ @ P @ FxJ.T + R)
 
-                        # Covariance update
-                        P = (np.eye(state_dim) - k @ FxJ) @ P
+                    # Covariance update
+                    P = (np.eye(state_dim) - k @ FxJ) @ P
 
-                        # State update
-                        z_dif = z - z_e
-                        z_dif[1] = ang_normalized(z_dif[1])
-                        X_e = X_e + k @ (z_dif)
-                        X_e[2] = ang_normalized(X_e[2])
+                    # State update
+                    z_dif = z - z_e
+                    z_dif[1] = ang_normalized(z_dif[1])
+                    X_e = X_e + k @ (z_dif)
+                    X_e[2] = ang_normalized(X_e[2])
 
-                        # Save the results in lists 
-                        X_t.append(X) 
-                        X_e_t.append(X_e)
-                        Zmed.append(z) 
-                        Zest.append(z_e)
-                        Ks.append(k)
+                    break
+
                 else:
                     landmarks.append(landmark_loc)
                     nr_landmarks += 1
@@ -288,11 +277,11 @@ for i in range(int(N)):
                         FxJ = grad_h_X
                     else:
                         iden = np.eye(5)
-                        zero_mat_before = np.zeros((5, 2*(j-2)))
+                        zero_mat_before = np.zeros((5, 2*j-2))
                         zero_mat_after = np.zeros((5, 2*nr_landmarks-2*j))
                         FxJ = np.insert(iden, [3], zero_mat_before, axis = 1)
                         FxJ = np.insert(FxJ, [5 + (2*j-2)], zero_mat_after, axis = 1)
-                        FxJ = grad_h_X * FxJ
+                        FxJ = grad_h_X @ FxJ
 
                     # Kalman Gain
                     k = P @ FxJ.T @ np.linalg.inv(FxJ @ P @ FxJ.T + R)
@@ -306,9 +295,12 @@ for i in range(int(N)):
                     X_e = X_e + k @ (z_dif)
                     X_e[2] = ang_normalized(X_e[2])
 
-                    # Save the results in lists 
-                    X_t.append(X) 
-                    X_e_t.append(X_e)
+                    break
+    print(time[i])
+    print(P)
+    # Save the results in lists 
+    X_t.append(X) 
+    X_e_t.append(X_e)
             
 
 
@@ -317,6 +309,8 @@ x_real = []
 y_real = []
 x_est = []
 y_est = []
+x_beacons = []
+y_beacons = []
 
 # Extract x and y values from each array in the list
 for array in X_t:
@@ -328,6 +322,11 @@ for array in X_e_t:
     x_est.append(array[0])  # Extract x (first element)
     y_est.append(array[1])  # Extract y (second element)
 
+# Extract x and y values from each array in the list
+for array in landmarks:
+    x_beacons.append(array[0])  # Extract x (first element)
+    y_beacons.append(array[1])  # Extract y (second element)
+
 
 
 # Create a function to update the plot in each animation frame
@@ -336,7 +335,7 @@ def update(frame):
     plt.subplot(121)  # Subplot on the left
     plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
     plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
-    #plt.scatter(landmark_x, landmark_y, label='Beacon 1 Coordinates', color='yellow', marker='s')
+    plt.scatter(x_beacons, y_beacons, label='Beacon 1 Coordinates', color='yellow', marker='s')
     plt.xlabel('X Position')
     plt.ylabel('Y Position')
     plt.title('Actual Robot Position Over Time')

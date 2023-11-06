@@ -245,11 +245,11 @@ for i in range(int(N)):
         z_dif[3] = ang_normalized(z_dif[3])
         X_e = X_e + k @ (z_dif)
         X_e[2] = ang_normalized(X_e[2])
-    
 
-    # Save the results in lists 
     X_t.append(X) 
     X_e_t.append(X_e)
+
+   
    
 
 # Initialize empty lists for x and y values
@@ -308,8 +308,8 @@ for array in X_e_t:
 
 # Create a plot for 'x' vs. 'y'
 plt.figure(figsize=(8, 6))
-plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s = 5)
-plt.scatter(x_est, y_est, label='Robot Position Estimation', color='r', s = 5)
+plt.plot(x_real, y_real, label='Real Robot Position', color='b')
+plt.plot(x_est, y_est, label='Robot Position Estimation', color='r')
 plt.xlabel('X Position')
 plt.ylabel('Y Position')
 plt.title('Actual Robot Position Over Time')
