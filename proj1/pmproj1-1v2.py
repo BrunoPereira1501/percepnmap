@@ -2,6 +2,7 @@ import numpy as np
 from numpy import *
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+import math
 
 def ang_normalized(ang):
     
@@ -29,7 +30,7 @@ Ks = []
 data_list = []
 
 # Open the data file for reading
-with open('Datasets-20231026/data1.txt', 'r') as file:
+with open('Datasets-20231106/data1.txt', 'r') as file:
     for line in file:
         # Split the line into individual values using spaces as the delimiter
         values = line.split()
@@ -83,6 +84,9 @@ Q = np.array([[0.5**2, 0],
 sdv_r = 0.5
 sdv_psi = 0.1
 
+R = np.array([[sdv_r ** 2, 0],
+              [0, sdv_psi ** 2]])
+
 # Variables to record simulation
 X_t = []
 X_e_t = []
@@ -113,14 +117,15 @@ for i in range(int(N)):
     # Real Trajectory
     X = [[x[i]], [y[i]], [theta[i]]]
      
+    xr_e = X_e_t[i][0][0]
+    yr_e = X_e_t[i][1][0]
+    theta_r_e = X_e_t[i][2][0]
     # Predict X(k+1) = f(X(k),U)
     x_k = xr_e + v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e)) 
     y_k = yr_e + v[i]/w[i] * (np.cos(theta_r_e) - np.cos(theta_r_e + w[i]*dt))
     theta_k = theta_r_e + w[i] * dt 
     X_e = np.array([[x_k], [y_k], [theta_k]])
-    xr_e = x_k
-    yr_e = y_k
-    theta_r_e = theta_k
+    
 
     # Gradient of f(X)
     grad_f_X = np.array([[1, 0, v[i]/w[i] * (np.cos(theta_r_e + w[i]*dt) - np.cos(theta_r_e))],
@@ -133,58 +138,42 @@ for i in range(int(N)):
             [0, dt]])
 
     # Covariance propagation
-    P = grad_f_X @ P @ grad_f_X.transpose() + grad_f_U @ Q @ grad_f_U.transpose()
+    P = grad_f_X @ P @ grad_f_X.T + grad_f_U @ Q @ grad_f_U.T
 
         
-    # Measures with the actual robot state, z=h(X)
-    distp_e_1 = np.sqrt((xp1 - X_e[0][0])**2 + (yp1 - X_e[1][0])**2)
-    theta_p_e_1 = ang_normalized(np.arctan2(yp1 - X_e[1][0], xp1 - X_e[0][0]) - X_e[2][0])
-    
-    # Measures with the actual robot state, z=h(X)
-    distp_e_2 = np.sqrt((xp2 - X_e[0][0])**2 + (yp2- X_e[1][0])**2)
-    theta_p_e_2 = ang_normalized(np.arctan2(yp2 - X_e[1][0], xp2 - X_e[0][0]) - X_e[2][0])
+    for j in range(2):
 
-    z_e = np.array([[distp_e_1],
-            [theta_p_e_1], 
-            [distp_e_2],
-            [theta_p_e_2]])
-    
-    z = np.array([[r1[i]],
-            [psi1[i]],
-            [r2[i]],
-            [psi2[i]]])
-    
-    # Covariance for the measures 
-    R = [[sdv_r**2, 0, 0, 0],
-            [0, sdv_psi**2, 0, 0],
-            [0, 0, sdv_r**2, 0],
-            [0, 0, 0, sdv_psi**2]]
+        if j == 0:
+            r, psi, landmark_x, landmark_y = r1[i], psi1[i], xp1, yp1
+        else:
+            r, psi, landmark_x, landmark_y = r2[i], psi2[i], xp2, yp2
 
-    # Gradient of h(X)
-    grad_h_X  = np.array([[-((xp1 - X_e[0][0])/(np.sqrt((xp1-X_e[0][0])**2+(yp1-X_e[1][0])**2))), -((yp1-X_e[1][0])/(np.sqrt((xp1-X_e[0][0])**2+(yp1-X_e[1][0])**2))), 0],
-            [((yp1-X_e[1][0])/((xp1-X_e[0][0])**2+(yp1-X_e[1][0])**2)), -((xp1-X_e[0][0])/((xp1-X_e[0][0])**2+(yp1-X_e[1][0])**2)), -1],
-            [-((xp2 - X_e[0][0])/(np.sqrt((xp2-X_e[0][0])**2+(yp2-X_e[1][0])**2))), -((yp2-X_e[1][0])/(np.sqrt((xp2-X_e[0][0])**2+(yp2-X_e[1][0])**2))), 0],
-            [((yp2-X_e[1][0])/((xp2-X_e[0][0])**2+(yp2-X_e[1][0])**2)), -((xp2-X_e[0][0])/((xp2-X_e[0][0])**2+(yp2-X_e[1][0])**2)), -1]])
-        
-    # Kalman Gain
-    k = P @ grad_h_X.transpose() @ np.linalg.inv(grad_h_X @ P @ grad_h_X.transpose() + R)
+        delta_x = landmark_x - X_e[0][0]
+        delta_y = landmark_y - X_e[1][0]
+        landmark_distance = np.sqrt(delta_x ** 2 + delta_y ** 2)
 
-    # Covariance update
-    P = (np.eye(3)- k @ grad_h_X) @ P
+        H = np.array([[landmark_distance],
+                    [ang_normalized(math.atan2(delta_y, delta_x) - X_e[2][0])]])
+
+        fH = np.array([[- delta_x / landmark_distance, - delta_y / landmark_distance, 0],
+                    [delta_y / (landmark_distance ** 2), - delta_x / (landmark_distance ** 2), -1]])
+
+        K = P @ fH.T @ np.linalg.inv(fH @ P @ fH.T + R)
+
+        z = np.array([[r],
+                    [psi]])
+
     
-    # State update
-    z_dif = z - z_e
-    z_dif[1] = ang_normalized(z_dif[1])
-    z_dif[3] = ang_normalized(z_dif[3])
-    X_e = X_e + k @ (z_dif)
-    X_e[2] = ang_normalized(X_e[2])
-
-    # Save the results in lists 
+        z_dif = z - H
+        z_dif[1] = ang_normalized(z_dif[1])
+        X_e = X_e + K @ (z_dif)
+        X_e[2] = ang_normalized(X_e[2])
+        P = P - K @ (fH @ P @ fH.T + R) @ K.T
+        # Save the results in lists 
     X_t.append(X) 
     X_e_t.append(X_e)
     Zmed.append(z) 
-    Zest.append(z_e)
-    Ks.append(k)
+   
 
 # Initialize empty lists for x and y values
 x_real = []
@@ -194,46 +183,48 @@ y_est = []
 
 # Extract x and y values from each array in the list
 for array in X_t:
-    x_real.append(array[0][0])  # Extract x (first element)
-    y_real.append(array[1][0])  # Extract y (second element)
+    x_real.append(array[0])  # Extract x (first element)
+    y_real.append(array[1])  # Extract y (second element)
 
 # Extract x and y values from each array in the list
 for array in X_e_t:
-    x_est.append(array[0][0])  # Extract x (first element)
-    y_est.append(array[1][0])  # Extract y (second element)
+    x_est.append(array[0])  # Extract x (first element)
+    y_est.append(array[1])  # Extract y (second element)
 
 
+print(X_e)
+# # Create a function to update the plot in each animation frame
+# def update(frame):
+#     plt.clf()  # Clear the previous frame
+#     plt.subplot(121)  # Subplot on the left
+#     plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
+#     plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
+#     plt.scatter(xp1, yp1, label='Beacon 1 Coordinates', color='yellow', marker='s')
+#     plt.scatter(xp2, yp2, label='Beacon 2 Coordinates', color='orange', marker='s')
+#     plt.xlabel('X Position')
+#     plt.ylabel('Y Position')
+#     plt.title('Actual Robot Position Over Time')
+#     plt.legend()
+#     plt.grid(True)
 
-# Create a function to update the plot in each animation frame
-def update(frame):
-    plt.clf()  # Clear the previous frame
-    plt.subplot(121)  # Subplot on the left
-    plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
-    plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
-    plt.scatter(xp1, yp1, label='Beacon 1 Coordinates', color='yellow', marker='s')
-    plt.scatter(xp2, yp2, label='Beacon 2 Coordinates', color='orange', marker='s')
-    plt.xlabel('X Position')
-    plt.ylabel('Y Position')
-    plt.title('Actual Robot Position Over Time')
-    plt.legend()
-    plt.grid(True)
+#     plt.subplot(122)  # Subplot on the right
+#     plt.scatter(x_real[:frame], y_real[:frame], color='red', label='Real Trajectory', s=5)
+#     plt.scatter(x_est[:frame], y_est[:frame], color='green', label='Estimated Trajectory', s=5)
+#     plt.text(-5, 0, f'Frame: {frame}', fontsize=12, color='black')  # Add frame number as text
+#     plt.xlabel('X')
+#     plt.ylabel('Y')
+#     plt.legend()
 
-    plt.subplot(122)  # Subplot on the right
-    plt.scatter(x_real[:frame], y_real[:frame], color='red', label='Real Trajectory', s=5)
-    plt.scatter(x_est[:frame], y_est[:frame], color='green', label='Estimated Trajectory', s=5)
-    plt.text(-5, 0, f'Frame: {frame}', fontsize=12, color='black')  # Add frame number as text
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.legend()
+# # Create a figure with two subplots
+# plt.figure(figsize=(12, 6))
 
-# Create a figure with two subplots
-plt.figure(figsize=(12, 6))
+# # Create the initial plot
+# ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=1)
 
-# Create the initial plot
-ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=1)
+# # Show the animation
+# plt.show()
 
-# Show the animation
-plt.show()
+print(x_est)
 
 # Create a plot for 'x' vs. 'y'
 plt.figure(figsize=(8, 6))

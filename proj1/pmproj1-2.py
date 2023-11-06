@@ -29,7 +29,7 @@ Ks = []
 data_list = []
 
 # Open the data file for reading
-with open('Datasets-20231026\data2.txt', 'r') as file:
+with open('Datasets-20231026/data2.txt', 'r') as file:
     for line in file:
         # Split the line into individual values using spaces as the delimiter
         values = line.split()
@@ -166,7 +166,7 @@ for i in range(int(N)):
 
 
     # Check if B2 is in the field of view
-    elif(r2[i] == 0) and r1[i] != 0:
+    elif(r2[i] == 0) and (r1[i] != 0):
         # Measures with the actual robot state, z=h(X)
         distp_e_1 = np.sqrt((xp1 - xr_e)**2 + (yp1 - yr_e)**2)
         psi_p_e_1 = ang_normalized(np.arctan2(yp1 - yr_e, xp1 - xr_e) - theta_r_e)
@@ -267,43 +267,42 @@ for array in X_e_t:
     x_est.append(array[0][0])  # Extract x (first element)
     y_est.append(array[1][0])  # Extract y (second element)
 
-
-
-# Create a function to update the plot in each animation frame
-def update(frame):
-    plt.clf()  # Clear the previous frame
-    plt.subplot(121)  # Subplot on the left
-    plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
-    plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
+print(psi2)
+# # Create a function to update the plot in each animation frame
+# def update(frame):
+#     plt.clf()  # Clear the previous frame
+#     plt.subplot(121)  # Subplot on the left
+#     plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
+#     plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
     
-    detected_1 = 'yellow' if r1[frame] != 0 else 'k'
-    detected_2 = 'orange' if r2[frame] != 0 else 'k'
+#     detected_1 = 'yellow' if r1[frame] != 0 else 'k'
+#     detected_2 = 'orange' if r2[frame] != 0 else 'k'
  
-    plt.scatter(xp1, yp1, label='Beacon 1 Coordinates', color=detected_1, marker='s')
-    plt.scatter(xp2, yp2, label='Beacon 2 Coordinates', color=detected_2, marker='s')    
+#     plt.scatter(xp1, yp1, label='Beacon 1 Coordinates', color=detected_1, marker='s')
+#     plt.scatter(xp2, yp2, label='Beacon 2 Coordinates', color=detected_2, marker='s')    
     
-    plt.xlabel('X Position')
-    plt.ylabel('Y Position')
-    plt.title('Actual Robot Position Over Time')
-    plt.text(-5, 0, f'Frame: {frame}', fontsize=12, color='black')  # Add frame number as text
-    plt.legend()
-    plt.grid(True)
+#     plt.xlabel('X Position')
+#     plt.ylabel('Y Position')
+#     plt.title('Actual Robot Position Over Time')
+#     plt.text(-5, 0, f'Frame: {frame}', fontsize=12, color='black')  # Add frame number as text
+#     plt.legend()
+#     plt.grid(True)
 
-    plt.subplot(122)  # Subplot on the right
-    plt.scatter(x_real[:frame], y_real[:frame], color='red', label='Real Trajectory', s=5)
-    plt.scatter(x_est[:frame], y_est[:frame], color='green', label='Estimated Trajectory', s=5)
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.legend()
+#     plt.subplot(122)  # Subplot on the right
+#     plt.scatter(x_real[:frame], y_real[:frame], color='red', label='Real Trajectory', s=5)
+#     plt.scatter(x_est[:frame], y_est[:frame], color='green', label='Estimated Trajectory', s=5)
+#     plt.xlabel('X')
+#     plt.ylabel('Y')
+#     plt.legend()
 
-# Create a figure with two subplots
-plt.figure(figsize=(12, 6))
+# # Create a figure with two subplots
+# plt.figure(figsize=(12, 6))
 
-# Create the initial plot
-ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=1)
+# # Create the initial plot
+# ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=1)
 
-# Show the animation
-plt.show()
+# # Show the animation
+# plt.show()
 
 # Create a plot for 'x' vs. 'y'
 plt.figure(figsize=(8, 6))

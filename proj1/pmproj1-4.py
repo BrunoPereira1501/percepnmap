@@ -154,7 +154,6 @@ for i in range(int(N)):
     # Covariance propagation
     P = Gt @ P @ Gt.T + Ut @ Q @ Ut.T
 
-    print(X_e)
     if(r[i] != 0.0):    
        
         landmark_loc = np.array([[X_e[0][0] + r[i] * np.cos(psi[i] + X_e[2][0])],
@@ -211,7 +210,7 @@ for i in range(int(N)):
 
         else:
             for landmark, j in zip(landmarks, arange(1, nr_landmarks)):
-                tol = 0.5
+                tol = 0.1
                 if((landmark[0] - 3 * tol < landmark_loc[0][0] < landmark[0] + 3 * tol) and (landmark[1] - 3 * tol < landmark_loc[1][0] < landmark[1] + 3 * tol)):
                     
                         distp_e = np.sqrt((landmark_loc[0][0] - X_e[0][0])**2 + (landmark_loc[1][0] - X_e[1][0])**2)
@@ -310,10 +309,7 @@ for i in range(int(N)):
                     # Save the results in lists 
                     X_t.append(X) 
                     X_e_t.append(X_e)
-                
-                    Zmed.append(z) 
-                    Zest.append(z_e)
-                    Ks.append(k)
+            
 
 
 # Initialize empty lists for x and y values
@@ -324,13 +320,13 @@ y_est = []
 
 # Extract x and y values from each array in the list
 for array in X_t:
-    x_real.append(array[0][0])  # Extract x (first element)
-    y_real.append(array[1][0])  # Extract y (second element)
+    x_real.append(array[0])  # Extract x (first element)
+    y_real.append(array[1])  # Extract y (second element)
 
 # Extract x and y values from each array in the list
 for array in X_e_t:
-    x_est.append(array[0][0])  # Extract x (first element)
-    y_est.append(array[1][0])  # Extract y (second element)
+    x_est.append(array[0])  # Extract x (first element)
+    y_est.append(array[1])  # Extract y (second element)
 
 
 

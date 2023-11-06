@@ -15,8 +15,9 @@ landmark1_y = 0
 landmark2_x = 10
 landmark2_y = 0
 
+
 # Read the data from data1.txt
-data = np.loadtxt('Datasets-20231026\data1.txt')
+data = np.loadtxt('Datasets-20231106/data1.txt')
 
 # Initialize state vector and covariance matrix
 initialPosition = ([[data[0][1]],
@@ -90,8 +91,11 @@ for i, row in enumerate(data):
     z = np.array([[r],
                   [psi]])
 
-    X_k = X_k + K @ (z - H)
-
+  
+    z_dif = z - H
+    z_dif[1] = normalizeAngle(z_dif[1])
+    X_k = X_k + K @ (z_dif)
+    X_k[2] = normalizeAngle(X_k[2])
     P = P - K @ (fH @ P @ fH.T + R) @ K.T
 
   x_real.append(xreal)
@@ -106,6 +110,8 @@ y_position = []
 for state in X:
   x_position.append(state[0])
   y_position.append(state[1])
+
+print(x_position)
 
 plt.figure(figsize=(8, 6))
 plt.plot(x_position, y_position, label = 'Estimated Trajectory', color = 'blue')
