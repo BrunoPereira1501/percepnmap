@@ -71,7 +71,7 @@ for i, row in enumerate(data):
 
   for j in range(2):
 
-    if j == 0:
+    if j == 0 :
       r, psi, landmark_x, landmark_y = r1, psi1, landmark1_x, landmark1_y
     else:
       r, psi, landmark_x, landmark_y = r2, psi2, landmark2_x, landmark2_y

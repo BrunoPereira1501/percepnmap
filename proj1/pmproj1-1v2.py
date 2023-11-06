@@ -168,6 +168,7 @@ for i in range(int(N)):
         z_dif[1] = ang_normalized(z_dif[1])
         X_e = X_e + K @ (z_dif)
         X_e[2] = ang_normalized(X_e[2])
+        
         P = P - K @ (fH @ P @ fH.T + R) @ K.T
         # Save the results in lists 
     X_t.append(X) 

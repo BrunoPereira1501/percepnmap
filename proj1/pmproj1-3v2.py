@@ -29,7 +29,7 @@ Ks = []
 data_list = []
 
 # Open the data file for reading
-with open('Datasets-20231026\data3.txt', 'r') as file:
+with open('Datasets-20231026/data3.txt', 'r') as file:
     for line in file:
         # Split the line into individual values using spaces as the delimiter
         values = line.split()
@@ -94,6 +94,7 @@ yp2 = 0
 
 # initial value for the estimated state
 X_e = [[x[0]], [y[0]], [theta[0]]]
+X_e_t.append(X_e)
 xr_e = x[0]
 yr_e = y[0]
 theta_r_e = theta[0]
@@ -107,12 +108,16 @@ for i in range(int(N)):
     
     # Real Trajectory
     X = [[x[i]], [y[i]], [theta[i]]]
+
+    xr_e = X_e_t[i][0][0]
+    yr_e = X_e_t[i][1][0]
+    theta_r_e = X_e_t[i][2][0]
      
-     # Predict X(k+1) = f(X(k),U)
-    xr_e = xr_e + v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e)) 
-    yr_e = yr_e + v[i]/w[i] * (np.cos(theta_r_e) - np.cos(theta_r_e + w[i]*dt))
-    theta_r_e = theta_r_e + w[i] * dt 
-    X_e = np.array([ [xr_e], [yr_e], [theta_r_e]])
+    # Predict X(k+1) = f(X(k),U)
+    xk= xr_e + v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e)) 
+    yk = yr_e + v[i]/w[i] * (np.cos(theta_r_e) - np.cos(theta_r_e + w[i]*dt))
+    thetak = theta_r_e + w[i] * dt 
+    X_e = np.array([[xk], [yk], [thetak]])
 
     # Gradient of f(X)
     grad_f_X = np.array([[1, 0, v[i]/w[i] * (np.cos(theta_r_e + w[i]*dt) - np.cos(theta_r_e))],
@@ -127,8 +132,8 @@ for i in range(int(N)):
     # Covariance propagation
     P = grad_f_X @ P @ grad_f_X.transpose() + grad_f_U @ Q @ grad_f_U.transpose()
 
-    distb1 = np.sqrt((xr_e - xp1)**2 + (yr_e - yp1)**2) 
-    distb2 = np.sqrt((xr_e - xp2)**2 + (yr_e - yp2)**2)
+    distb1 = np.sqrt((xk - xp1)**2 + (yk- yp1)**2) 
+    distb2 = np.sqrt((xk - xp2)**2 + (yk- yp2)**2)
 
     if(r[i] == 0):
         beacon1 = False
@@ -145,7 +150,7 @@ for i in range(int(N)):
         B.append(2)
     
     # Check if B1 is in the field of view
-    if(r[i] != 0 and beacon1):
+    if(r[i] != 0 and beacon2):
         # Measures with the actual robot state, z=h(X)
         distp_e_2 = np.sqrt((xp2 - xr_e)**2 + (yp2- yr_e)**2)
         psi_p_e_2 = ang_normalized(np.arctan2(yp2 - yr_e, xp2 - xr_e) - theta_r_e)
@@ -178,7 +183,7 @@ for i in range(int(N)):
         X_e[2] = ang_normalized(X_e[2])
 
     # Check if B2 is in the field of view
-    elif(r[i] != 0 and beacon2):
+    elif(r[i] != 0 and beacon1):
         # Measures with the actual robot state, z=h(X)
         distp_e_1 = np.sqrt((xp1 - xr_e)**2 + (yp1 - yr_e)**2)
         psi_p_e_1 = ang_normalized(np.arctan2(yp1 - yr_e, xp1 - xr_e) - theta_r_e)
@@ -201,22 +206,19 @@ for i in range(int(N)):
         # Kalman Gain
         k = P @ grad_h_X.transpose() @ np.linalg.inv(grad_h_X @ P @ grad_h_X.transpose() + R)
 
-        # Covariance update
-        P = (np.eye(3)- k @ grad_h_X) @ P
-
         # State update
         z_dif = z - z_e
         z_dif[1] = ang_normalized(z_dif[1])
         X_e = X_e + k @ (z_dif)
         X_e[2] = ang_normalized(X_e[2])
+
+        P = P - k @ (grad_h_X @ P @ grad_h_X.T + R) @ k.T
     
 
     # Save the results in lists 
     X_t.append(X) 
     X_e_t.append(X_e)
-    Zmed.append(z) 
-    Zest.append(z_e)
-    Ks.append(k)
+
 
 # Initialize empty lists for x and y values
 x_real = []
@@ -226,13 +228,13 @@ y_est = []
 
 # Extract x and y values from each array in the list
 for array in X_t:
-    x_real.append(array[0][0])  # Extract x (first element)
-    y_real.append(array[1][0])  # Extract y (second element)
+    x_real.append(array[0])  # Extract x (first element)
+    y_real.append(array[1])  # Extract y (second element)
 
 # Extract x and y values from each array in the list
 for array in X_e_t:
-    x_est.append(array[0][0])  # Extract x (first element)
-    y_est.append(array[1][0])  # Extract y (second element)
+    x_est.append(array[0])  # Extract x (first element)
+    y_est.append(array[1])  # Extract y (second element)
 
 
 

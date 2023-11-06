@@ -29,7 +29,7 @@ Ks = []
 data_list = []
 
 # Open the data file for reading
-with open('Datasets-20231026\data2.txt', 'r') as file:
+with open('Datasets-20231026/data2.txt', 'r') as file:
     for line in file:
         # Split the line into individual values using spaces as the delimiter
         values = line.split()
@@ -98,6 +98,7 @@ yp2 = 0
 
 # initial value for the estimated state
 X_e = [[x[0]], [y[0]], [theta[0]]]
+X_e_t.append(X_e)
 xr_e = x[0]
 yr_e = y[0]
 theta_r_e = theta[0]
@@ -109,23 +110,27 @@ dt = 0.1
 
 for i in range(int(N)):
     
-    # Real Trajectory
+    # Real Trajectoryxr_e
     X = [[x[i]], [y[i]], [theta[i]]]
+
+    xr_e = X_e_t[i][0][0]
+    yr_e = X_e_t[i][1][0]
+    theta_r_e = X_e_t[i][2][0]
      
     # Predict X(k+1) = f(X(k),U)
-    xr_e = xr_e + v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e)) 
-    yr_e = yr_e + v[i]/w[i] * (np.cos(theta_r_e) - np.cos(theta_r_e + w[i]*dt))
-    theta_r_e = theta_r_e + w[i] * dt 
-    X_e = np.array([ [xr_e], [yr_e], [theta_r_e]])
+    xk= xr_e + v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e)) 
+    yk = yr_e + v[i]/w[i] * (np.cos(theta_r_e) - np.cos(theta_r_e + w[i]*dt))
+    thetak = theta_r_e + w[i] * dt 
+    X_e = np.array([[xk], [yk], [thetak]])
 
     # Gradient of f(X)
-    grad_f_X = np.array([[1, 0, v[i]/w[i] * (np.cos(theta_r_e + w[i]*dt) - np.cos(theta_r_e))],
-            [0, 1, v[i]/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e))],
+    grad_f_X = np.array([[1, 0, v[i]/w[i] * (np.cos(thetak + w[i]*dt) - np.cos(thetak))],
+            [0, 1, v[i]/w[i] * (np.sin(thetak + w[i]*dt) - np.sin(thetak))],
             [0, 0, 1]])
     
     # Gradient of f(U)
-    grad_f_U = np.array([[1/w[i] * (np.sin(theta_r_e + w[i]*dt) - np.sin(theta_r_e)), v[i]/(w[i]**2) * (dt*w[i]*np.cos(theta_r_e + w[i]*dt) - np.sin(theta_r_e + w[i]*dt)+ np.sin(theta_r_e))],
-            [1/w[i] * (-np.cos(theta_r_e + w[i]*dt) + np.cos(theta_r_e)), v[i]/(w[i]**2) * (dt*w[i]*np.sin(theta_r_e + w[i]*dt) + np.cos(theta_r_e + w[i]*dt) - np.cos(theta_r_e))],
+    grad_f_U = np.array([[1/w[i] * (np.sin(thetak + w[i]*dt) - np.sin(thetak)), v[i]/(w[i]**2) * (dt*w[i]*np.cos(thetak + w[i]*dt) - np.sin(thetak + w[i]*dt)+ np.sin(thetak))],
+            [1/w[i] * (-np.cos(thetak + w[i]*dt) + np.cos(thetak)), v[i]/(w[i]**2) * (dt*w[i]*np.sin(thetak + w[i]*dt) + np.cos(thetak + w[i]*dt) - np.cos(thetak))],
             [0, dt]])
 
     # Covariance propagation
@@ -134,8 +139,8 @@ for i in range(int(N)):
     # Check if B1 is in the field of view
     if(r1[i] == 0 and r2[i] != 0):
         # Measures with the actual robot state, z=h(X)
-        distp_e_2 = np.sqrt((xp2 - xr_e)**2 + (yp2- yr_e)**2)
-        psi_p_e_2 = ang_normalized(np.arctan2(yp2 - yr_e, xp2 - xr_e) - theta_r_e)
+        distp_e_2 = np.sqrt((xp2 - xk)**2 + (yp2- yk)**2)
+        psi_p_e_2 = ang_normalized(np.arctan2(yp2 - yk, xp2 - xk) - thetak)
 
         z_e = np.array([[distp_e_2],
             [psi_p_e_2]])
@@ -149,14 +154,11 @@ for i in range(int(N)):
                
 
         # Gradient of h(X)
-        grad_h_X  = np.array([[-((xp2 - xr_e)/(np.sqrt((xp2-xr_e)**2+(yp2-yr_e)**2))), -((yp2-yr_e)/(np.sqrt((xp2-xr_e)**2+(yp2-yr_e)**2))), 0],
-                [((yp2-yr_e)/((xp2-xr_e)**2+(yp2-yr_e)**2)), -((xp2-xr_e)/((xp2-xr_e)**2+(yp2-yr_e)**2)), -1]])
+        grad_h_X  = np.array([[-((xp2 - xk)/(np.sqrt((xp2-xk)**2+(yp2-yk)**2))), -((yp2-yk)/(np.sqrt((xp2-xk)**2+(yp2-yk)**2))), 0],
+                [((yp2-yk)/((xp2-xk)**2+(yp2-yk)**2)), -((xp2-xk)/((xp2-xk)**2+(yp2-yk)**2)), -1]])
 
         # Kalman Gain
         k = P @ grad_h_X.transpose() @ np.linalg.inv(grad_h_X @ P @ grad_h_X.transpose() + R)
-
-        # Covariance update
-        P = (np.eye(3)- k @ grad_h_X) @ P
 
         # State update
         z_dif = z - z_e
@@ -164,12 +166,14 @@ for i in range(int(N)):
         X_e = X_e + k @ (z_dif)
         X_e[2] = ang_normalized(X_e[2])
 
+        P = P - k @ (grad_h_X @ P @ grad_h_X.T + R) @ k.T
+
 
     # Check if B2 is in the field of view
-    elif(r2[i] == 0) and r1[i] != 0:
+    elif((r2[i] == 0) and (r1[i] != 0)):
         # Measures with the actual robot state, z=h(X)
-        distp_e_1 = np.sqrt((xp1 - xr_e)**2 + (yp1 - yr_e)**2)
-        psi_p_e_1 = ang_normalized(np.arctan2(yp1 - yr_e, xp1 - xr_e) - theta_r_e)
+        distp_e_1 = np.sqrt((xp1 - xk)**2 + (yp1 - yk)**2)
+        psi_p_e_1 = ang_normalized(np.arctan2(yp1 - yk, xp1 - xk) - thetak)
 
         z_e = np.array([[distp_e_1],
                 [psi_p_e_1]])
@@ -183,14 +187,11 @@ for i in range(int(N)):
                
 
         # Gradient of h(X)
-        grad_h_X  = np.array([[-((xp1 - xr_e)/(np.sqrt((xp1-xr_e)**2+(yp1-yr_e)**2))), -((yp1-yr_e)/(np.sqrt((xp1-xr_e)**2+(yp1-yr_e)**2))), 0],
-                [((yp1-yr_e)/((xp1-xr_e)**2+(yp1-yr_e)**2)), -((xp1-xr_e)/((xp1-xr_e)**2+(yp1-yr_e)**2)), -1]])
+        grad_h_X  = np.array([[-((xp1 - xk)/(np.sqrt((xp1-xk)**2+(yp1-yk)**2))), -((yp1-yk)/(np.sqrt((xp1-xk)**2+(yp1-yk)**2))), 0],
+                [((yp1-yk)/((xp1-xk)**2+(yp1-yk)**2)), -((xp1-xk)/((xp1-xk)**2+(yp1-yk)**2)), -1]])
 
         # Kalman Gain
         k = P @ grad_h_X.transpose() @ np.linalg.inv(grad_h_X @ P @ grad_h_X.transpose() + R)
-
-        # Covariance update
-        P = (np.eye(3)- k @ grad_h_X) @ P
 
         # State update
         z_dif = z - z_e
@@ -198,15 +199,17 @@ for i in range(int(N)):
         X_e = X_e + k @ (z_dif)
         X_e[2] = ang_normalized(X_e[2])
 
+        P = P - k @ (grad_h_X @ P @ grad_h_X.T + R) @ k.T
+
     # Check if B1 and B2 are in the field of view
     elif(r1[i] != 0 and r2[i] != 0):
         # Measures with the actual robot state, z=h(X)
-        distp_e_1 = np.sqrt((xp1 - xr_e)**2 + (yp1 - yr_e)**2)
-        psi_p_e_1 = ang_normalized(np.arctan2(yp1 - yr_e, xp1 - xr_e) - theta_r_e)
+        distp_e_1 = np.sqrt((xp1 - xk)**2 + (yp1 - yk)**2)
+        psi_p_e_1 = ang_normalized(np.arctan2(yp1 - yk, xp1 - xk) - thetak)
         
         # Measures with the actual robot state, z=h(X)
-        distp_e_2 = np.sqrt((xp2 - xr_e)**2 + (yp2- yr_e)**2)
-        psi_p_e_2 = ang_normalized(np.arctan2(yp2 - yr_e, xp2 - xr_e) - theta_r_e)
+        distp_e_2 = np.sqrt((xp2 - xk)**2 + (yp2- yk)**2)
+        psi_p_e_2 = ang_normalized(np.arctan2(yp2 - yk, xp2 - xk) - thetak)
 
         z_e = np.array([[distp_e_1],
             [psi_p_e_1], 
@@ -225,10 +228,10 @@ for i in range(int(N)):
                 [0, 0, 0, sdv_psi**2]]
 
         # Gradient of h(X)
-        grad_h_X  = np.array([[-((xp1 - xr_e)/(np.sqrt((xp1-xr_e)**2+(yp1-yr_e)**2))), -((yp1-yr_e)/(np.sqrt((xp1-xr_e)**2+(yp1-yr_e)**2))), 0],
-                [((yp1-yr_e)/((xp1-xr_e)**2+(yp1-yr_e)**2)), -((xp1-xr_e)/((xp1-xr_e)**2+(yp1-yr_e)**2)), -1],
-                [-((xp2 - xr_e)/(np.sqrt((xp2-xr_e)**2+(yp2-yr_e)**2))), -((yp2-yr_e)/(np.sqrt((xp2-xr_e)**2+(yp2-yr_e)**2))), 0],
-                [((yp2-yr_e)/((xp2-xr_e)**2+(yp2-yr_e)**2)), -((xp2-xr_e)/((xp2-xr_e)**2+(yp2-yr_e)**2)), -1]])
+        grad_h_X  = np.array([[-((xp1 - xk)/(np.sqrt((xp1-xk)**2+(yp1-yk)**2))), -((yp1-yk)/(np.sqrt((xp1-xk)**2+(yp1-yk)**2))), 0],
+                [((yp1-yk)/((xp1-xk)**2+(yp1-yk)**2)), -((xp1-xk)/((xp1-xk)**2+(yp1-yk)**2)), -1],
+                [-((xp2 - xk)/(np.sqrt((xp2-xk)**2+(yp2-yk)**2))), -((yp2-yk)/(np.sqrt((xp2-xk)**2+(yp2-yk)**2))), 0],
+                [((yp2-yk)/((xp2-xk)**2+(yp2-yk)**2)), -((xp2-xk)/((xp2-xk)**2+(yp2-yk)**2)), -1]])
 
         # Kalman Gain
         k = P @ grad_h_X.transpose() @ np.linalg.inv(grad_h_X @ P @ grad_h_X.transpose() + R)
@@ -247,9 +250,7 @@ for i in range(int(N)):
     # Save the results in lists 
     X_t.append(X) 
     X_e_t.append(X_e)
-    Zmed.append(z) 
-    Zest.append(z_e)
-    Ks.append(k)
+   
 
 # Initialize empty lists for x and y values
 x_real = []
@@ -269,41 +270,41 @@ for array in X_e_t:
 
 
 
-# Create a function to update the plot in each animation frame
-def update(frame):
-    plt.clf()  # Clear the previous frame
-    plt.subplot(121)  # Subplot on the left
-    plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
-    plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
+# # Create a function to update the plot in each animation frame
+# def update(frame):
+#     plt.clf()  # Clear the previous frame
+#     plt.subplot(121)  # Subplot on the left
+#     plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
+#     plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
     
-    detected_1 = 'yellow' if r1[frame] != 0 else 'k'
-    detected_2 = 'orange' if r2[frame] != 0 else 'k'
+#     detected_1 = 'yellow' if r1[frame] != 0 else 'k'
+#     detected_2 = 'orange' if r2[frame] != 0 else 'k'
  
-    plt.scatter(xp1, yp1, label='Beacon 1 Coordinates', color=detected_1, marker='s')
-    plt.scatter(xp2, yp2, label='Beacon 2 Coordinates', color=detected_2, marker='s')    
+#     plt.scatter(xp1, yp1, label='Beacon 1 Coordinates', color=detected_1, marker='s')
+#     plt.scatter(xp2, yp2, label='Beacon 2 Coordinates', color=detected_2, marker='s')    
     
-    plt.xlabel('X Position')
-    plt.ylabel('Y Position')
-    plt.title('Actual Robot Position Over Time')
-    plt.text(-5, 0, f'Frame: {frame}', fontsize=12, color='black')  # Add frame number as text
-    plt.legend()
-    plt.grid(True)
+#     plt.xlabel('X Position')
+#     plt.ylabel('Y Position')
+#     plt.title('Actual Robot Position Over Time')
+#     plt.text(-5, 0, f'Frame: {frame}', fontsize=12, color='black')  # Add frame number as text
+#     plt.legend()
+#     plt.grid(True)
 
-    plt.subplot(122)  # Subplot on the right
-    plt.scatter(x_real[:frame], y_real[:frame], color='red', label='Real Trajectory', s=5)
-    plt.scatter(x_est[:frame], y_est[:frame], color='green', label='Estimated Trajectory', s=5)
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.legend()
+#     plt.subplot(122)  # Subplot on the right
+#     plt.scatter(x_real[:frame], y_real[:frame], color='red', label='Real Trajectory', s=5)
+#     plt.scatter(x_est[:frame], y_est[:frame], color='green', label='Estimated Trajectory', s=5)
+#     plt.xlabel('X')
+#     plt.ylabel('Y')
+#     plt.legend()
 
-# Create a figure with two subplots
-plt.figure(figsize=(12, 6))
+# # Create a figure with two subplots
+# plt.figure(figsize=(12, 6))
 
-# Create the initial plot
-ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=1)
+# # Create the initial plot
+# ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=1)
 
-# Show the animation
-plt.show()
+# # Show the animation
+# plt.show()
 
 # Create a plot for 'x' vs. 'y'
 plt.figure(figsize=(8, 6))
