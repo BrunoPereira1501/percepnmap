@@ -28,7 +28,7 @@ X_e_t = []
 data_list = []
 
 # Open the data file for reading
-with open('percepnmap/Datasets-20231106/data4.txt', 'r') as file:
+with open('Datasets-20231026/data4.txt', 'r') as file:
     for line in file:
         # Split the line into individual values using spaces as the delimiter
         values = line.split()
@@ -379,7 +379,7 @@ for array in landmarks:
 # # Show the animation
 # plt.show()
 
-print('\n'.join(['\t'.join([f'{cell:.2fS}' for cell in row]) for row in P]))
+#print('\n'.join(['\t'.join([f'{cell:.2fS}' for cell in row]) for row in P]))
 
 # Create a plot for 'x' vs. 'y'
 plt.figure(figsize=(8, 6))
