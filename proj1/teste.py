@@ -79,9 +79,8 @@ sdv_psi = 0.1
 # Variables to record simulation
 X_t = []
 X_e_t = []
-Zmed = []
-Zest = []
-Ks = []
+landNum = 0
+landNumlist = []
 
 # Beacons coordinates
 xp1 = 0
@@ -150,7 +149,8 @@ for i in range(int(N)):
 
     # Covariance propagation
     P = Gt @ P @ Gt.T + Ut @ Q @ Ut.T
-
+    
+    landNum = -1
     if(r[i] != 0.0):    
        
         landmark_loc = np.array([[X_e[0][0] + r[i] * np.cos(psi[i] + X_e[2][0])],
@@ -193,7 +193,6 @@ for i in range(int(N)):
             # Kalman Gain
             k = P @ FxJ.T @ np.linalg.inv(FxJ @ P @ FxJ.T + R)
 
-            print(k)
         
             # Covariance update
             P = (np.eye(state_dim) - k @ FxJ) @ P
@@ -203,6 +202,8 @@ for i in range(int(N)):
             z_dif[1] = ang_normalized(z_dif[1])
             X_e = X_e + k @ (z_dif)
             X_e[2] = ang_normalized(X_e[2])
+
+            landNum = 0
 
         else:
             # If there are known beacons, associate the measurement with the closest one
@@ -215,11 +216,12 @@ for i in range(int(N)):
                     min_distance = distance
                     closest_landmark_idx = j
 
+
             # Check if the measurement corresponds to a known landmark or a new one
             if min_distance < 10:
                 # If associated with a known beacon, update that landmark
                 closest_landmark = landmarks[closest_landmark_idx]
-                print(closest_landmark)
+
                 # Update the associated landmark logic here
 
                 distp_e = np.sqrt((closest_landmark[0][0] - X_e[0][0])**2 + (closest_landmark[1][0] - X_e[1][0])**2)
@@ -262,6 +264,10 @@ for i in range(int(N)):
                 z_dif[1] = ang_normalized(z_dif[1])
                 X_e = X_e + k @ (z_dif)
                 X_e[2] = ang_normalized(X_e[2])
+
+                landNum = closest_landmark_idx
+
+                
 
             else:
                 j+=1
@@ -306,8 +312,6 @@ for i in range(int(N)):
                 # Kalman Gain
                 k = P @ FxJ.T @ np.linalg.inv(FxJ @ P @ FxJ.T + R)
 
-                print(k)
-
                 # Covariance update
                 P = (np.eye(state_dim) - k @ FxJ) @ P
 
@@ -316,11 +320,14 @@ for i in range(int(N)):
                 z_dif[1] = ang_normalized(z_dif[1])
                 X_e = X_e + k @ (z_dif)
                 X_e[2] = ang_normalized(X_e[2])
+
+                landNum = nr_landmarks-1
                 
 
     # Save the results in lists 
     X_t.append(X) 
     X_e_t.append(X_e)
+    landNumlist.append(landNum)
             
 #print(landmarks)
 
@@ -350,36 +357,47 @@ for array in landmarks:
 
 
 #Create a function to update the plot in each animation frame
-# def update(frame):
-#     plt.clf()  # Clear the previous frame
-#     plt.subplot(121)  # Subplot on the left
-#     plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
-#     plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
-#     plt.scatter(x_beacons, y_beacons, label='Possible Beacon Coordinates', color='orange', marker='s')
-#     plt.xlabel('X Position')
-#     plt.ylabel('Y Position')
-#     plt.title('Actual Robot Position Over Time')
-#     plt.legend()
-#     plt.grid(True)
+def update(frame):
+    plt.clf()  # Clear the previous frame
+    plt.subplot(121)  # Subplot on the left
+    plt.scatter(x_real, y_real, label='Real Robot Position', color='b', s=5)
+    plt.scatter(x_est[:frame], y_est[:frame], label='Robot Position Estimation', color='r', s=5, linestyle='-')
 
-#     plt.subplot(122)  # Subplot on the right
-#     plt.scatter(x_real[:frame], y_real[:frame], color='red', label='Real Trajectory', s=5)
-#     plt.scatter(x_est[:frame], y_est[:frame], color='green', label='Estimated Trajectory', s=5)
-#     plt.text(-5, 0, f'Frame: {frame}', fontsize=12, color='black')  # Add frame number as text
-#     plt.xlabel('X')
-#     plt.ylabel('Y')
-#     plt.legend()
+    detected_0 = 'orange' if landNumlist[frame] == 0 else 'k'
+    detected_1 = 'orange' if landNumlist[frame] == 1 else 'k'
+    detected_2 = 'orange' if landNumlist[frame] == 2 else 'k'
+    detected_3 = 'orange' if landNumlist[frame] == 3 else 'k'
+ 
+    plt.scatter(x_beacons[0], y_beacons[0], label='Beacon 0 Coordinates', color=detected_0, marker='s')
+    plt.scatter(x_beacons[1], y_beacons[1], label='Beacon 1 Coordinates', color=detected_1, marker='s')  
+    plt.scatter(x_beacons[2], y_beacons[2], label='Beacon 2 Coordinates', color=detected_2, marker='s')
+    plt.scatter(x_beacons[3], y_beacons[3], label='Beacon 3 Coordinates', color=detected_3, marker='s')   
+    
+    plt.xlabel('X Position')
+    plt.ylabel('Y Position')
+    plt.title('Actual Robot Position Over Time')
+    plt.legend()
+    plt.grid(True)
+
+    plt.subplot(122)  # Subplot on the right
+    plt.scatter(x_real[:frame], y_real[:frame], color='red', label='Real Trajectory', s=5)
+    plt.scatter(x_est[:frame], y_est[:frame], color='green', label='Estimated Trajectory', s=5)
+    plt.text(-5, 0, f'Frame: {frame}', fontsize=12, color='black')  # Add frame number as text
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.legend()
 
 # # Create a figure with two subplots
-# plt.figure(figsize=(12, 6))
+plt.figure(figsize=(12, 6))
 
 # # Create the initial plot
-# ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=1)
+ani = FuncAnimation(plt.gcf(), update, frames=len(x_real), repeat=False, interval=1)
 
 # # Show the animation
-# plt.show()
+plt.show()
 
 #print('\n'.join(['\t'.join([f'{cell:.2fS}' for cell in row]) for row in P]))
+
 
 # Create a plot for 'x' vs. 'y'
 plt.figure(figsize=(8, 6))
