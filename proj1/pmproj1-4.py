@@ -28,7 +28,7 @@ X_e_t = []
 data_list = []
 
 # Open the data file for reading
-with open('percepnmap/Datasets-20231106/data4.txt', 'r') as file:
+with open('Datasets-20231106/data4.txt', 'r') as file:
     for line in file:
         # Split the line into individual values using spaces as the delimiter
         values = line.split()
@@ -193,7 +193,7 @@ for i in range(int(N)):
             # Kalman Gain
             k = P @ FxJ.T @ np.linalg.inv(FxJ @ P @ FxJ.T + R)
 
-            print(k)
+            #print(k)
         
             # Covariance update
             P = (np.eye(state_dim) - k @ FxJ) @ P
@@ -219,7 +219,7 @@ for i in range(int(N)):
             if min_distance < 10:
                 # If associated with a known beacon, update that landmark
                 closest_landmark = landmarks[closest_landmark_idx]
-                print(closest_landmark)
+                #print(closest_landmark)
                 # Update the associated landmark logic here
 
                 distp_e = np.sqrt((closest_landmark[0][0] - X_e[0][0])**2 + (closest_landmark[1][0] - X_e[1][0])**2)
@@ -306,7 +306,7 @@ for i in range(int(N)):
                 # Kalman Gain
                 k = P @ FxJ.T @ np.linalg.inv(FxJ @ P @ FxJ.T + R)
 
-                print(k)
+                #print(k)
 
                 # Covariance update
                 P = (np.eye(state_dim) - k @ FxJ) @ P
@@ -379,7 +379,7 @@ for array in landmarks:
 # # Show the animation
 # plt.show()
 
-print('\n'.join(['\t'.join([f'{cell:.2fS}' for cell in row]) for row in P]))
+#print('\n'.join(['\t'.join([f'{cell:.2fS}' for cell in row]) for row in P]))
 
 # Create a plot for 'x' vs. 'y'
 plt.figure(figsize=(8, 6))

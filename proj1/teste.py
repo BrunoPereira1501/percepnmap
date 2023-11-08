@@ -354,7 +354,7 @@ for array in landmarks:
     x_beacons.append(array[0])  # Extract x (first element)
     y_beacons.append(array[1])  # Extract y (second element)
 
-
+print(landmarks)
 
 #Create a function to update the plot in each animation frame
 def update(frame):

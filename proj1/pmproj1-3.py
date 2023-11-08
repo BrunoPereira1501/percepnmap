@@ -29,7 +29,7 @@ Ks = []
 data_list = []
 
 # Open the data file for reading
-with open('Datasets-20231026/data3.txt', 'r') as file:
+with open('Datasets-20231106/data3.txt', 'r') as file:
     for line in file:
         # Split the line into individual values using spaces as the delimiter
         values = line.split()
